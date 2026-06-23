@@ -1,0 +1,3 @@
+# This directory stores uploaded attachment files.
+# Files are saved with UUID-based filenames to prevent enumeration and conflicts.
+# This directory is gitignored — only this .gitkeep file is tracked.
