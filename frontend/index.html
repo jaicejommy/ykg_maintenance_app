@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Yokogawa Maintenance Data Entry & Management System — Plant intranet login." />
+  <title>Login — Yokogawa Maintenance System</title>
+  <link rel="stylesheet" href="css/bootstrap.min.css" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<main class="login-page" role="main">
+  <div class="login-container">
+    <div class="login-card">
+
+      <!-- Logo & Brand -->
+      <div class="login-logo-area">
+        <div class="login-logo-circle" aria-hidden="true">⚙</div>
+        <div class="ykg-logo mb-1"><span>YOKOGAWA</span></div>
+        <div class="ykg-tagline">Electric Corporation</div>
+      </div>
+
+      <!-- Form Header -->
+      <h1 class="login-form-title text-center">Maintenance System</h1>
+      <div class="login-divider mx-auto"></div>
+
+      <!-- Login Form -->
+      <form id="login-form" novalidate autocomplete="off">
+
+        <div class="mb-3">
+          <label for="username" class="form-label">
+            Username <span class="required-star" aria-hidden="true">*</span>
+          </label>
+          <input
+            type="text"
+            id="username"
+            name="username"
+            class="form-control"
+            placeholder="Enter your username"
+            autocomplete="username"
+            required
+            maxlength="50"
+          />
+          <div id="username-error" class="field-error" role="alert"></div>
+        </div>
+
+        <div class="mb-4">
+          <label for="password" class="form-label">
+            Password <span class="required-star" aria-hidden="true">*</span>
+          </label>
+          <div class="password-wrapper">
+            <input
+              type="password"
+              id="password"
+              name="password"
+              class="form-control"
+              placeholder="Enter your password"
+              autocomplete="current-password"
+              required
+            />
+            <button
+              type="button"
+              id="toggle-password"
+              class="password-toggle"
+              aria-label="Toggle password visibility"
+              title="Show/hide password"
+            >👁</button>
+          </div>
+          <div id="password-error" class="field-error" role="alert"></div>
+        </div>
+
+        <button
+          type="submit"
+          id="btn-login"
+          class="btn btn-primary-ykg w-100 py-2"
+        >
+          Login
+        </button>
+
+      </form>
+
+      <!-- Footer note -->
+      <p class="text-center text-muted-custom mt-4 mb-0" style="font-size: 0.75rem;">
+        Plant intranet application &mdash; authorized personnel only
+      </p>
+
+    </div>
+
+    <!-- Version footer -->
+    <p class="text-center mt-3" style="font-size: 0.7rem; color: var(--color-text-dim);">
+      Maintenance Data Entry &amp; Management System v1.0
+    </p>
+  </div>
+</main>
+
+<!-- Toast container rendered dynamically by ui.js -->
+<div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+<script src="js/bootstrap.bundle.min.js"></script>
+<script src="js/constants.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/api.js"></script>
+<script src="js/validators.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
