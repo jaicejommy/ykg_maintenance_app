@@ -1,7 +1,8 @@
 /* frontend/css/styles.css
- * Custom Yokogawa Maintenance System styling.
- * Augments Bootstrap 5 with brand colours, industrial aesthetics, and micro-animations.
- * All class names use kebab-case.
+ * E-LogBook Maintenance Management System — UI styles.
+ * Change 1: All "Yokogawa" brand red replaced with royal blue.
+ * Change 2: White / light background, clean modern Bootstrap-compatible design.
+ * HTML class names, IDs, and JS-facing attributes are NOT changed.
  */
 
 /* ============================================================
@@ -10,44 +11,55 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap');
 
 :root {
-  /* Brand colours */
-  --ykg-red:          #E60012;
-  --ykg-red-dark:     #c0000f;
-  --ykg-red-light:    #ff2233;
-  --ykg-red-subtle:   rgba(230, 0, 18, 0.08);
+  /* ── Brand / primary ──────────────────────────────────────── */
+  --color-primary:        #2563EB;   /* Royal blue — primary actions, active states */
+  --color-primary-dark:   #1D4ED8;   /* Darker blue — hover states */
+  --color-primary-light:  #EFF6FF;   /* Very light blue — backgrounds, row highlights */
 
-  /* Neutrals */
-  --color-bg:         #0f1117;
-  --color-surface:    #1a1d27;
-  --color-surface-2:  #21253a;
-  --color-surface-3:  #2a2f45;
-  --color-border:     rgba(255,255,255,0.08);
-  --color-border-2:   rgba(255,255,255,0.14);
+  /* ── Surfaces ─────────────────────────────────────────────── */
+  --color-surface:        #FFFFFF;   /* Page and card background */
+  --color-surface-alt:    #F8FAFC;   /* Alternate row / subtle section background */
+  --color-surface-2:      #F1F5F9;   /* Input backgrounds, section cards */
+  --color-surface-3:      #E2E8F0;   /* Deeper divider areas */
 
-  /* Text */
-  --color-text:       #e8eaf6;
-  --color-text-muted: #8892a4;
-  --color-text-dim:   #555f72;
+  /* ── Borders ──────────────────────────────────────────────── */
+  --color-border:         #E2E8F0;   /* All borders and dividers */
+  --color-border-2:       #CBD5E1;   /* Slightly darker border variant */
 
-  /* Status */
-  --color-success:    #22c55e;
-  --color-warning:    #f59e0b;
-  --color-error:      #ef4444;
-  --color-info:       #3b82f6;
+  /* ── Text ─────────────────────────────────────────────────── */
+  --color-text-primary:   #0F172A;   /* Headings and body text */
+  --color-text-secondary: #64748B;   /* Labels, metadata, placeholder text */
+  --color-text-dim:       #94A3B8;   /* Very muted text */
 
-  /* Spacing & radius */
+  /* ── Semantic status ──────────────────────────────────────── */
+  --color-danger:         #DC2626;   /* Delete buttons, error states */
+  --color-success:        #16A34A;   /* Success toasts */
+  --color-warning:        #D97706;   /* Warning states */
+  --color-info:           #2563EB;   /* Info — same as primary */
+
+  /* Legacy aliases kept so existing inline styles referencing
+     --ykg-red, --color-bg, etc. degrade gracefully */
+  --ykg-red:              #2563EB;
+  --ykg-red-dark:         #1D4ED8;
+  --ykg-red-light:        #EFF6FF;
+  --color-bg:             #F8FAFC;
+  --color-text:           #0F172A;
+  --color-text-muted:     #64748B;
+  --color-error:          #DC2626;
+
+  /* ── Radius ───────────────────────────────────────────────── */
   --radius-sm:  6px;
-  --radius-md:  10px;
-  --radius-lg:  16px;
-  --radius-xl:  24px;
+  --radius-md:  8px;
+  --radius-lg:  12px;
+  --radius-xl:  16px;
 
-  /* Shadows */
-  --shadow-sm:  0 1px 3px rgba(0,0,0,0.4);
-  --shadow-md:  0 4px 16px rgba(0,0,0,0.5);
-  --shadow-lg:  0 8px 32px rgba(0,0,0,0.6);
-  --shadow-red: 0 4px 20px rgba(230,0,18,0.3);
+  /* ── Shadows ──────────────────────────────────────────────── */
+  --shadow-sm:  0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-md:  0 4px 16px rgba(0, 0, 0, 0.08);
+  --shadow-lg:  0 8px 32px rgba(0, 0, 0, 0.10);
+  --shadow-red: 0 4px 20px rgba(37, 99, 235, 0.25);   /* Blue glow */
 
-  /* Transitions */
+  /* ── Transitions ──────────────────────────────────────────── */
   --transition-fast: 0.15s ease;
   --transition-med:  0.25s ease;
 }
@@ -65,9 +77,9 @@ html {
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background-color: var(--color-bg);
-  color: var(--color-text);
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background-color: var(--color-surface-alt);
+  color: var(--color-text-primary);
   min-height: 100vh;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
@@ -77,27 +89,27 @@ body {
    3. SCROLLBAR (webkit)
    ============================================================ */
 ::-webkit-scrollbar          { width: 6px; height: 6px; }
-::-webkit-scrollbar-track    { background: var(--color-surface); }
-::-webkit-scrollbar-thumb    { background: var(--color-surface-3); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--color-border-2); }
+::-webkit-scrollbar-track    { background: var(--color-surface-alt); }
+::-webkit-scrollbar-thumb    { background: var(--color-border-2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-dim); }
 
 /* ============================================================
    4. TYPOGRAPHY
    ============================================================ */
 h1, h2, h3, h4, h5, h6 {
   font-weight: 600;
-  letter-spacing: -0.02em;
-  color: var(--color-text);
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
 }
 
 .page-title {
-  font-size: 1.5rem;
+  font-size: 1.4rem;
   font-weight: 700;
-  color: var(--color-text);
+  color: var(--color-text-primary);
 }
 
 .text-muted-custom {
-  color: var(--color-text-muted) !important;
+  color: var(--color-text-secondary) !important;
   font-size: 0.875rem;
 }
 
@@ -107,39 +119,40 @@ code, .mono {
 }
 
 /* ============================================================
-   5. YOKOGAWA BRAND ELEMENTS
+   5. BRAND / LOGO ELEMENTS
    ============================================================ */
+/* MMS logo mark — bold, uppercase, primary blue */
 .ykg-logo {
   font-family: 'Inter', sans-serif;
-  font-size: 1.6rem;
+  font-size: 1.8rem;
   font-weight: 800;
   letter-spacing: 0.08em;
-  color: var(--ykg-red);
+  color: var(--color-primary);
   text-transform: uppercase;
   user-select: none;
 }
 
 .ykg-logo span {
   display: inline-block;
-  background: linear-gradient(135deg, var(--ykg-red) 0%, #ff6b7a 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--color-primary);
+  /* Remove gradient so MMS is plain blue, not translucent */
+  background: none;
+  -webkit-text-fill-color: var(--color-primary);
 }
 
 .ykg-tagline {
-  font-size: 0.7rem;
-  letter-spacing: 0.18em;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
   font-weight: 500;
-  margin-top: -4px;
+  margin-top: -2px;
 }
 
 .brand-accent {
   width: 3px;
-  height: 24px;
-  background: linear-gradient(180deg, var(--ykg-red) 0%, transparent 100%);
+  height: 22px;
+  background: var(--color-primary);
   border-radius: 2px;
   display: inline-block;
   margin-right: 10px;
@@ -150,18 +163,17 @@ code, .mono {
    6. NAVIGATION BAR
    ============================================================ */
 .app-navbar {
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
+  background: var(--color-primary);
+  border-bottom: none;
   padding: 0 1.5rem;
-  height: 60px;
+  height: 56px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   position: sticky;
   top: 0;
   z-index: 1000;
-  backdrop-filter: blur(8px);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.18);
 }
 
 .navbar-brand-area {
@@ -170,23 +182,24 @@ code, .mono {
   gap: 12px;
 }
 
+/* Vertical divider — now white instead of red */
 .navbar-red-line {
   width: 2px;
-  height: 32px;
-  background: var(--ykg-red);
+  height: 28px;
+  background: rgba(255, 255, 255, 0.45);
   border-radius: 1px;
 }
 
 .app-title {
   font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--color-text);
+  font-weight: 700;
+  color: #FFFFFF;
   letter-spacing: 0.01em;
 }
 
 .app-subtitle {
   font-size: 0.7rem;
-  color: var(--color-text-muted);
+  color: rgba(255, 255, 255, 0.75);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -201,8 +214,8 @@ code, .mono {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: var(--radius-md);
   padding: 5px 12px;
 }
@@ -211,13 +224,13 @@ code, .mono {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--ykg-red) 0%, var(--ykg-red-dark) 100%);
+  background: rgba(255, 255, 255, 0.25);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 0.75rem;
   font-weight: 700;
-  color: white;
+  color: #FFFFFF;
   flex-shrink: 0;
 }
 
@@ -226,14 +239,15 @@ code, .mono {
 }
 
 .user-name {
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   font-weight: 600;
-  color: var(--color-text);
+  color: #FFFFFF;
+  opacity: 0.95;
 }
 
 .user-role-badge {
   font-size: 0.65rem;
-  color: var(--color-text-muted);
+  color: rgba(255, 255, 255, 0.75);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -242,29 +256,32 @@ code, .mono {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--color-text-muted);
+  color: rgba(255, 255, 255, 0.85);
   text-decoration: none;
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   font-weight: 500;
-  padding: 6px 12px;
+  padding: 5px 10px;
   border-radius: var(--radius-sm);
   transition: all var(--transition-fast);
   border: 1px solid transparent;
 }
 
 .btn-back-nav:hover {
-  color: var(--color-text);
-  background: var(--color-surface-2);
-  border-color: var(--color-border);
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 /* ============================================================
    7. BUTTONS
    ============================================================ */
+
+/* Base overrides applied to all .btn */
 .btn {
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   font-weight: 500;
   font-size: 0.875rem;
+  padding: 0.45rem 1rem;
   transition: all var(--transition-fast);
   border: 1px solid transparent;
   display: inline-flex;
@@ -272,79 +289,107 @@ code, .mono {
   gap: 6px;
 }
 
+/* Primary — royal blue */
+.btn-primary,
 .btn-primary-ykg {
-  background: var(--ykg-red);
-  color: white;
-  border-color: var(--ykg-red);
-  box-shadow: 0 2px 8px rgba(230,0,18,0.2);
+  background: var(--color-primary);
+  color: #FFFFFF;
+  border-color: var(--color-primary);
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.18);
 }
 
+.btn-primary:hover:not(:disabled),
 .btn-primary-ykg:hover:not(:disabled) {
-  background: var(--ykg-red-dark);
-  border-color: var(--ykg-red-dark);
-  box-shadow: var(--shadow-red);
+  background: var(--color-primary-dark);
+  border-color: var(--color-primary-dark);
+  color: #FFFFFF;
   transform: translateY(-1px);
-  color: white;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.28);
 }
 
+.btn-primary:active,
 .btn-primary-ykg:active {
   transform: translateY(0);
 }
 
+.btn-primary:disabled,
 .btn-primary-ykg:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
+.btn-primary:focus-visible,
+.btn-primary-ykg:focus-visible {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
+  outline: none;
+}
+
+/* Outline primary */
+.btn-outline-primary {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: transparent;
+}
+
+.btn-outline-primary:hover {
+  background: var(--color-primary);
+  color: #FFFFFF;
+  border-color: var(--color-primary);
+}
+
+/* Outline surface (cancel / secondary) */
 .btn-outline-surface {
   background: transparent;
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
   border-color: var(--color-border-2);
 }
 
 .btn-outline-surface:hover {
   background: var(--color-surface-2);
-  color: var(--color-text);
+  color: var(--color-text-primary);
   border-color: var(--color-border-2);
 }
 
+/* Danger — keep existing red */
 .btn-danger-soft {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--color-error);
-  border-color: rgba(239,68,68,0.25);
+  background: rgba(220, 38, 38, 0.08);
+  color: var(--color-danger);
+  border-color: rgba(220, 38, 38, 0.22);
 }
 
 .btn-danger-soft:hover {
-  background: rgba(239, 68, 68, 0.2);
-  border-color: rgba(239,68,68,0.4);
-  color: var(--color-error);
+  background: rgba(220, 38, 38, 0.16);
+  border-color: rgba(220, 38, 38, 0.38);
+  color: var(--color-danger);
 }
 
+/* Edit action */
 .btn-edit-soft {
-  background: rgba(59, 130, 246, 0.1);
-  color: var(--color-info);
-  border-color: rgba(59,130,246,0.25);
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--color-primary);
+  border-color: rgba(37, 99, 235, 0.2);
   font-size: 0.8rem;
 }
 
 .btn-edit-soft:hover {
-  background: rgba(59, 130, 246, 0.2);
-  border-color: rgba(59,130,246,0.4);
-  color: var(--color-info);
+  background: rgba(37, 99, 235, 0.16);
+  border-color: rgba(37, 99, 235, 0.35);
+  color: var(--color-primary-dark);
 }
 
+/* Logout — white outlined on blue navbar */
 .btn-logout {
   background: transparent;
-  color: var(--color-text-muted);
-  border-color: var(--color-border);
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.5);
   font-size: 0.82rem;
   padding: 5px 12px;
 }
 
 .btn-logout:hover {
-  background: rgba(239,68,68,0.1);
-  color: var(--color-error);
-  border-color: rgba(239,68,68,0.3);
+  background: rgba(255, 255, 255, 0.12);
+  color: #FFFFFF;
+  border-color: rgba(255, 255, 255, 0.7);
 }
 
 /* Spinner inside button */
@@ -354,15 +399,21 @@ code, .mono {
   border-width: 2px;
 }
 
+/* Global focus ring */
+.btn:focus-visible {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
+  outline: none;
+}
+
 /* ============================================================
    8. FORM CONTROLS
    ============================================================ */
 .form-control,
 .form-select {
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border-2);
-  color: var(--color-text);
-  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  border-radius: var(--radius-md);
   padding: 0.55rem 0.85rem;
   font-size: 0.9rem;
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
@@ -370,10 +421,11 @@ code, .mono {
 
 .form-control:focus,
 .form-select:focus {
-  background: var(--color-surface-2);
-  border-color: var(--ykg-red);
-  color: var(--color-text);
-  box-shadow: 0 0 0 3px rgba(230,0,18,0.18);
+  background: var(--color-surface);
+  border-color: var(--color-primary);
+  color: var(--color-text-primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  outline: none;
 }
 
 .form-control::placeholder {
@@ -381,17 +433,19 @@ code, .mono {
 }
 
 .form-label {
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  margin-bottom: 0.35rem;
 }
 
 .form-label .required-star {
-  color: var(--ykg-red);
+  color: var(--color-danger);
   margin-left: 3px;
+}
+
+.required-star {
+  color: var(--color-danger);
 }
 
 .form-text {
@@ -406,9 +460,9 @@ code, .mono {
 }
 
 .form-control[type="file"]::-webkit-file-upload-button {
-  background: var(--color-surface-3);
-  border: 1px solid var(--color-border-2);
-  color: var(--color-text-muted);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
   padding: 4px 12px;
   border-radius: var(--radius-sm);
   font-size: 0.8rem;
@@ -418,8 +472,8 @@ code, .mono {
 }
 
 .form-control[type="file"]::-webkit-file-upload-button:hover {
-  background: var(--color-surface-2);
-  color: var(--color-text);
+  background: var(--color-border);
+  color: var(--color-text-primary);
 }
 
 /* Show/hide password toggle */
@@ -442,14 +496,14 @@ code, .mono {
 }
 
 .password-toggle:hover {
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
 }
 
 /* Inline validation error */
 .field-error {
   display: none;
   font-size: 0.78rem;
-  color: var(--color-error);
+  color: var(--color-danger);
   margin-top: 4px;
   animation: fadeIn var(--transition-fast);
 }
@@ -460,8 +514,8 @@ code, .mono {
 
 .form-control.is-invalid,
 .form-select.is-invalid {
-  border-color: var(--color-error) !important;
-  box-shadow: 0 0 0 3px rgba(239,68,68,0.15) !important;
+  border-color: var(--color-danger) !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12) !important;
 }
 
 /* File info row */
@@ -471,10 +525,11 @@ code, .mono {
   gap: 8px;
   margin-top: 6px;
   font-size: 0.8rem;
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
   padding: 6px 10px;
-  background: var(--color-surface-3);
+  background: var(--color-surface-2);
   border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
 }
 
 .file-info-row.visible {
@@ -483,7 +538,7 @@ code, .mono {
 
 .file-info-name {
   font-weight: 500;
-  color: var(--color-text);
+  color: var(--color-text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -493,6 +548,7 @@ code, .mono {
 .file-info-size {
   margin-left: auto;
   flex-shrink: 0;
+  color: var(--color-text-secondary);
 }
 
 .file-warning {
@@ -500,14 +556,14 @@ code, .mono {
 }
 
 /* ============================================================
-   9. CARDS
+   9. CARDS & PANELS
    ============================================================ */
 .app-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: 2rem;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-sm);
 }
 
 .form-card {
@@ -515,15 +571,16 @@ code, .mono {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: 2rem 2.5rem;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-sm);
 }
 
 .section-card {
-  background: var(--color-surface-2);
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   padding: 1.25rem 1.5rem;
   margin-bottom: 1.25rem;
+  box-shadow: var(--shadow-sm);
 }
 
 .section-card-title {
@@ -531,7 +588,7 @@ code, .mono {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--ykg-red);
+  color: var(--color-primary);
   margin-bottom: 1rem;
   display: flex;
   align-items: center;
@@ -553,7 +610,7 @@ code, .mono {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-bg);
+  background: var(--color-surface-alt);
   position: relative;
   overflow: hidden;
 }
@@ -561,11 +618,11 @@ code, .mono {
 .login-page::before {
   content: '';
   position: absolute;
-  width: 600px;
-  height: 600px;
+  width: 500px;
+  height: 500px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(230,0,18,0.06) 0%, transparent 70%);
-  top: -200px;
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.06) 0%, transparent 70%);
+  top: -150px;
   right: -100px;
   pointer-events: none;
 }
@@ -573,12 +630,12 @@ code, .mono {
 .login-page::after {
   content: '';
   position: absolute;
-  width: 400px;
-  height: 400px;
+  width: 350px;
+  height: 350px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(59,130,246,0.04) 0%, transparent 70%);
-  bottom: -100px;
-  left: -50px;
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.04) 0%, transparent 70%);
+  bottom: -80px;
+  left: -60px;
   pointer-events: none;
 }
 
@@ -594,65 +651,74 @@ code, .mono {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
-  padding: 2.5rem 2.25rem;
-  box-shadow: var(--shadow-lg), 0 0 0 1px rgba(255,255,255,0.02);
+  padding: 2.5rem;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.07);
 }
 
 .login-logo-area {
   text-align: center;
-  margin-bottom: 2rem;
+  margin-bottom: 1.75rem;
 }
 
+/* Icon circle — blue */
 .login-logo-circle {
-  width: 64px;
-  height: 64px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--ykg-red) 0%, var(--ykg-red-dark) 100%);
+  background: var(--color-primary);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 1rem;
-  box-shadow: var(--shadow-red);
-  font-size: 1.5rem;
-  color: white;
+  margin: 0 auto 0.85rem;
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.28);
+  font-size: 1.4rem;
+  color: #FFFFFF;
 }
 
 .login-app-name {
   font-size: 1.1rem;
   font-weight: 700;
-  color: var(--color-text);
+  color: var(--color-text-primary);
   margin-bottom: 2px;
 }
 
 .login-form-title {
-  font-size: 1.4rem;
+  font-size: 1.35rem;
   font-weight: 700;
-  color: var(--color-text);
-  margin-bottom: 0.25rem;
+  color: var(--color-text-primary);
+  margin-bottom: 0.2rem;
 }
 
+/* Divider — blue */
 .login-divider {
-  width: 40px;
+  width: 36px;
   height: 3px;
-  background: var(--ykg-red);
+  background: var(--color-primary);
   border-radius: 2px;
-  margin: 0 auto 1.75rem;
+  margin: 0 auto 1.5rem;
 }
 
 /* ============================================================
    11. DASHBOARD / DATA TABLE
    ============================================================ */
 .dashboard-layout {
-  min-height: calc(100vh - 60px);
+  min-height: calc(100vh - 56px);
   padding: 1.5rem;
+  max-width: 1280px;
+  margin: 0 auto;
 }
 
+/* Toolbar row */
 .toolbar {
   display: flex;
   align-items: center;
   gap: 12px;
   margin-bottom: 1.25rem;
   flex-wrap: wrap;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
 }
 
 .toolbar-search {
@@ -679,6 +745,7 @@ code, .mono {
   min-width: 180px;
 }
 
+/* Records table wrapper */
 .records-table-wrapper {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -693,21 +760,23 @@ code, .mono {
   font-size: 0.875rem;
 }
 
+/* Table head — royal blue */
 .records-table thead tr {
-  background: var(--color-surface-2);
-  border-bottom: 1px solid var(--color-border);
+  background: var(--color-primary);
 }
 
 .records-table thead th {
   padding: 0.75rem 1rem;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--color-text-muted);
+  letter-spacing: 0.06em;
+  color: #FFFFFF;
   white-space: nowrap;
+  border: none;
 }
 
+/* Table body */
 .records-table tbody tr {
   border-bottom: 1px solid var(--color-border);
   transition: background var(--transition-fast);
@@ -717,25 +786,32 @@ code, .mono {
   border-bottom: none;
 }
 
+.records-table tbody tr:nth-child(even) {
+  background: var(--color-surface-alt);
+}
+
 .records-table tbody tr:hover {
-  background: var(--color-surface-2);
+  background: var(--color-primary-light);
 }
 
 .records-table td {
   padding: 0.75rem 1rem;
   vertical-align: middle;
-  color: var(--color-text);
+  color: var(--color-text-primary);
 }
 
+/* Record ID badge */
 .record-id-badge {
   font-family: 'Roboto Mono', monospace;
   font-size: 0.78rem;
-  color: var(--color-text-muted);
-  background: var(--color-surface-3);
+  color: var(--color-text-secondary);
+  background: var(--color-surface-2);
   padding: 2px 7px;
   border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
 }
 
+/* Type badges */
 .type-badge {
   display: inline-flex;
   align-items: center;
@@ -747,41 +823,42 @@ code, .mono {
 }
 
 .type-badge-planned {
-  background: rgba(59,130,246,0.12);
-  color: #60a5fa;
-  border: 1px solid rgba(59,130,246,0.2);
+  background: rgba(37, 99, 235, 0.10);
+  color: #1D4ED8;
+  border: 1px solid rgba(37, 99, 235, 0.20);
 }
 
 .type-badge-conducted {
-  background: rgba(34,197,94,0.12);
-  color: #4ade80;
-  border: 1px solid rgba(34,197,94,0.2);
+  background: rgba(22, 163, 74, 0.10);
+  color: #15803D;
+  border: 1px solid rgba(22, 163, 74, 0.20);
 }
 
+/* Attachment link */
 .attachment-link {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: var(--color-info);
+  color: var(--color-primary);
   text-decoration: none;
   font-size: 0.8rem;
   font-weight: 500;
   padding: 3px 8px;
   border-radius: var(--radius-sm);
-  background: rgba(59,130,246,0.08);
+  background: rgba(37, 99, 235, 0.07);
   transition: all var(--transition-fast);
 }
 
 .attachment-link:hover {
-  background: rgba(59,130,246,0.18);
-  color: #93c5fd;
+  background: rgba(37, 99, 235, 0.15);
+  color: var(--color-primary-dark);
 }
 
 .attachment-dash {
   color: var(--color-text-dim);
-  font-size: 0.9rem;
 }
 
+/* Action buttons */
 .actions-cell {
   white-space: nowrap;
 }
@@ -800,25 +877,25 @@ code, .mono {
 }
 
 .btn-action-edit {
-  background: rgba(59,130,246,0.1);
-  color: #60a5fa;
-  border-color: rgba(59,130,246,0.2);
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--color-primary);
+  border-color: rgba(37, 99, 235, 0.18);
 }
 
 .btn-action-edit:hover {
-  background: rgba(59,130,246,0.2);
-  color: #93c5fd;
+  background: rgba(37, 99, 235, 0.16);
+  color: var(--color-primary-dark);
 }
 
 .btn-action-delete {
-  background: rgba(239,68,68,0.1);
-  color: #f87171;
-  border-color: rgba(239,68,68,0.2);
+  background: rgba(220, 38, 38, 0.08);
+  color: var(--color-danger);
+  border-color: rgba(220, 38, 38, 0.18);
 }
 
 .btn-action-delete:hover {
-  background: rgba(239,68,68,0.2);
-  color: #fca5a5;
+  background: rgba(220, 38, 38, 0.16);
+  color: #991B1B;
 }
 
 /* Empty state */
@@ -830,11 +907,11 @@ code, .mono {
 .empty-state-icon {
   font-size: 2.5rem;
   margin-bottom: 1rem;
-  opacity: 0.3;
+  opacity: 0.25;
 }
 
 .empty-state-text {
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
   font-size: 0.95rem;
   margin-bottom: 0.25rem;
 }
@@ -859,27 +936,28 @@ code, .mono {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  padding: 8px 14px;
-  font-size: 0.82rem;
+  padding: 10px 16px;
+  box-shadow: var(--shadow-sm);
 }
 
 .stat-chip-value {
-  font-size: 1.1rem;
+  font-size: 1.2rem;
   font-weight: 700;
-  color: var(--color-text);
+  color: var(--color-text-primary);
   font-family: 'Roboto Mono', monospace;
 }
 
 .stat-chip-label {
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
   font-size: 0.75rem;
+  font-weight: 500;
 }
 
 /* ============================================================
    12. FORM PAGE
    ============================================================ */
 .form-layout {
-  min-height: calc(100vh - 60px);
+  min-height: calc(100vh - 56px);
   padding: 1.5rem;
   max-width: 900px;
   margin: 0 auto;
@@ -892,12 +970,13 @@ code, .mono {
 .form-page-title {
   font-size: 1.35rem;
   font-weight: 700;
+  color: var(--color-text-primary);
   margin-bottom: 2px;
 }
 
 .form-page-subtitle {
   font-size: 0.82rem;
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
 }
 
 /* ============================================================
@@ -905,9 +984,10 @@ code, .mono {
    ============================================================ */
 .toast-container {
   position: fixed;
-  top: 72px;
+  bottom: 24px;
   right: 20px;
-  z-index: 9999;
+  top: auto;
+  z-index: 1100;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -937,12 +1017,35 @@ code, .mono {
   left: 0;
   top: 0;
   bottom: 0;
-  width: 3px;
+  width: 4px;
+}
+
+/* Success toast */
+.app-toast-success {
+  background: #F0FDF4;
+  border-color: rgba(22, 163, 74, 0.25);
+  color: #166534;
 }
 
 .app-toast-success::before { background: var(--color-success); }
-.app-toast-error::before   { background: var(--color-error); }
-.app-toast-info::before    { background: var(--color-info); }
+
+/* Error toast */
+.app-toast-error {
+  background: #FEF2F2;
+  border-color: rgba(220, 38, 38, 0.25);
+  color: #991B1B;
+}
+
+.app-toast-error::before { background: var(--color-danger); }
+
+/* Info toast */
+.app-toast-info {
+  background: #EFF6FF;
+  border-color: rgba(37, 99, 235, 0.25);
+  color: #1E40AF;
+}
+
+.app-toast-info::before { background: var(--color-primary); }
 
 .toast-icon {
   font-size: 1rem;
@@ -950,33 +1053,29 @@ code, .mono {
   margin-top: 1px;
 }
 
-.app-toast-success .toast-icon { color: var(--color-success); }
-.app-toast-error   .toast-icon { color: var(--color-error); }
-.app-toast-info    .toast-icon { color: var(--color-info); }
-
 .toast-body {
   flex: 1;
 }
 
 .toast-message {
   font-size: 0.875rem;
-  color: var(--color-text);
   line-height: 1.4;
 }
 
 .toast-dismiss {
   background: none;
   border: none;
-  color: var(--color-text-dim);
+  color: currentColor;
+  opacity: 0.5;
   cursor: pointer;
   padding: 0;
   font-size: 0.9rem;
   line-height: 1;
   flex-shrink: 0;
-  transition: color var(--transition-fast);
+  transition: opacity var(--transition-fast);
 }
 
-.toast-dismiss:hover { color: var(--color-text-muted); }
+.toast-dismiss:hover { opacity: 0.85; }
 
 .toast-fade-out {
   animation: toastFadeOut 0.3s ease forwards;
@@ -990,6 +1089,7 @@ code, .mono {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
+  color: var(--color-text-primary);
 }
 
 .modal-header {
@@ -1000,29 +1100,18 @@ code, .mono {
 .modal-title {
   font-size: 1rem;
   font-weight: 700;
+  color: var(--color-text-primary);
 }
 
 .modal-body {
   padding: 1.25rem 1.5rem;
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
   font-size: 0.9rem;
 }
 
 .modal-footer {
   border-top: 1px solid var(--color-border);
   padding: 1rem 1.5rem;
-}
-
-.modal-backdrop {
-  backdrop-filter: blur(4px);
-}
-
-.btn-close {
-  filter: invert(1) opacity(0.5);
-}
-
-.btn-close:hover {
-  filter: invert(1) opacity(0.8);
 }
 
 /* ============================================================
@@ -1041,25 +1130,6 @@ code, .mono {
 @keyframes toastFadeOut {
   from { opacity: 1; transform: translateX(0); }
   to   { opacity: 0; transform: translateX(20px); }
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.loading-overlay {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(15,17,23,0.6);
-  backdrop-filter: blur(4px);
-  z-index: 9000;
-  align-items: center;
-  justify-content: center;
-}
-
-.loading-overlay.active {
-  display: flex;
 }
 
 .separator {
@@ -1083,7 +1153,7 @@ code, .mono {
 
   .records-table thead th:nth-child(7),
   .records-table tbody td:nth-child(7) {
-    display: none; /* Hide "Created By" on tablets */
+    display: none;
   }
 }
 
@@ -1108,7 +1178,7 @@ code, .mono {
 
   .records-table thead th:nth-child(6),
   .records-table tbody td:nth-child(6) {
-    display: none; /* Hide "Responsible Person" on mobile */
+    display: none;
   }
 
   .user-details {
