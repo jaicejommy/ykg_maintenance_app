@@ -207,8 +207,9 @@ function renderRecordsTable(records, userRole, username) {
 
     const attachmentCell = record.attachment_original_name
       ? `<a href="#" class="attachment-link"
-           onclick="handleDownload(event, ${record.id}, '${escapeHtml(record.attachment_original_name)}')">
-           📎 ${escapeHtml(record.attachment_original_name)}
+           onclick="handleDownload(event, ${record.id}, '${escapeHtml(record.attachment_original_name)}')"
+           title="Download attachment">
+           ${escapeHtml(record.attachment_original_name)}
          </a>`
       : `<span class="attachment-dash">—</span>`;
 
@@ -217,12 +218,12 @@ function renderRecordsTable(records, userRole, username) {
     const canDelete = isAdmin;
 
     const editBtn = canEdit
-      ? `<a href="form.html?id=${record.id}" class="btn-action btn-action-edit">✏ Edit</a>`
+      ? `<a href="form.html?id=${record.id}" class="btn-action btn-action-edit">Edit</a>`
       : "";
 
     const deleteBtn = canDelete
       ? `<button class="btn-action btn-action-delete"
-            onclick="handleDeleteClick(${record.id}, this)">🗑 Delete</button>`
+            onclick="handleDeleteClick(${record.id}, this)">Delete</button>`
       : "";
 
     const actionsCell = (editBtn || deleteBtn)
@@ -294,4 +295,90 @@ function populateForm(record) {
     if (fileName)     fileName.textContent = record.attachment_original_name + " (existing)";
     if (currentAttach) currentAttach.textContent = record.attachment_original_name;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Record detail modal
+// ---------------------------------------------------------------------------
+
+/**
+ * Populate and open the #recordDetailModal for a given record.
+ * Uses textContent and setAttribute only — no innerHTML with record data.
+ * @param {object} record
+ * @param {string} userRole
+ * @param {string} username
+ */
+function showRecordDetail(record, userRole, username) {
+  const modal = document.getElementById("recordDetailModal");
+  if (!modal) return;
+
+  const nullish = (v) => (v !== null && v !== undefined && v !== "") ? v : "\u2014";
+
+  const set = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = nullish(value);
+  };
+
+  set("detail-id",                    record.id);
+  set("detail-maintenance-type",      record.maintenance_type);
+  set("detail-equipment-id",          record.equipment_id);
+  set("detail-responsible-person",    record.responsible_person);
+  set("detail-operating-conditions",  record.operating_conditions);
+  set("detail-inventory-consumables", record.inventory_consumables);
+  set("detail-remarks",               record.remarks);
+  set("detail-created-by",            record.created_by);
+  set("detail-created-date",          record.created_date);
+  set("detail-updated-by",            record.updated_by);
+  set("detail-updated-date",          record.updated_date);
+
+  // Format datetime
+  if (record.date_time) {
+    const dt = new Date(record.date_time);
+    const formatted = isNaN(dt.getTime())
+      ? record.date_time
+      : dt.toLocaleString("en-GB", {
+          day: "2-digit", month: "short", year: "numeric",
+          hour: "2-digit", minute: "2-digit",
+        });
+    const dtEl = document.getElementById("detail-date-time");
+    if (dtEl) dtEl.textContent = formatted;
+  } else {
+    set("detail-date-time", null);
+  }
+
+  // Attachment — use setAttribute, never innerHTML
+  const attachEl = document.getElementById("detail-attachment");
+  if (attachEl) {
+    attachEl.textContent = "";
+    if (record.attachment_original_name) {
+      const link = document.createElement("a");
+      link.setAttribute("href", `${API_BASE}/api/attachments/${record.id}`);
+      link.textContent = record.attachment_original_name;
+      link.className = "attachment-link";
+      link.addEventListener("click", (e) => {
+        e.preventDefault();
+        handleDownload(e, record.id, record.attachment_original_name);
+      });
+      attachEl.appendChild(link);
+    } else {
+      attachEl.textContent = "\u2014";
+    }
+  }
+
+  // Edit button visibility
+  const isAdmin    = userRole === ROLES.ADMIN;
+  const isEngineer = userRole === ROLES.ENGINEER;
+  const canEdit    = isAdmin || (isEngineer && record.created_by === username);
+
+  const editBtn = document.getElementById("detail-btn-edit");
+  if (editBtn) {
+    if (canEdit) {
+      editBtn.classList.remove("d-none");
+      editBtn.setAttribute("href", `form.html?id=${record.id}`);
+    } else {
+      editBtn.classList.add("d-none");
+    }
+  }
+
+  new bootstrap.Modal(modal).show();
 }
