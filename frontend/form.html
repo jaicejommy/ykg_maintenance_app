@@ -3,239 +3,272 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="E-LogBook Maintenance System — create or edit a maintenance record." />
+  <meta name="description" content="Maintenance Management System — create or edit a maintenance record." />
   <title>Record Form — Maintenance Management System</title>
   <link rel="stylesheet" href="css/bootstrap.min.css" />
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
 
-<!-- =====================================================================
-     NAVIGATION BAR
-     ===================================================================== -->
-<nav class="app-navbar" role="navigation" aria-label="Main navigation">
-  <div class="navbar-brand-area">
-    <a href="dashboard.html" class="btn-back-nav" aria-label="Back to dashboard">
-      &larr; Back
-    </a>
-    <div class="navbar-red-line" aria-hidden="true"></div>
-    <div>
-      <div class="app-title">Maintenance Management System</div>
-      <div class="app-subtitle">E-LogBook</div>
+<div class="app-shell">
+
+  <!-- =====================================================================
+       FIXED LEFT SIDEBAR
+       ===================================================================== -->
+  <aside class="sidebar" id="sidebar">
+
+    <!-- Logo / App Identity -->
+    <div class="sidebar-brand">
+      <span class="sidebar-brand-mark">MMS</span>
+      <span class="sidebar-brand-label">Maintenance<br>Management</span>
     </div>
-  </div>
 
-  <!-- Manage Users link — visible to Administrators only (toggled by app.js) -->
-  <a
-    id="nav-manage-users"
-    href="manage-users.html"
-    class="nav-text-link d-none"
-    aria-label="Manage Users"
-  >Manage Users</a>
+    <div class="sidebar-divider"></div>
 
-  <div class="navbar-user-info">
-    <div class="user-badge" aria-label="Logged in user">
-      <div class="user-avatar" id="navbar-avatar-initials" aria-hidden="true">U</div>
-      <div class="user-details">
-        <div class="user-name" id="navbar-username">—</div>
-        <div class="user-role-badge" id="navbar-role">—</div>
-      </div>
-    </div>
-    <button id="btn-logout" class="btn btn-logout" type="button" aria-label="Logout">
-      Logout
-    </button>
-  </div>
-</nav>
+    <!-- Primary Navigation -->
+    <nav class="sidebar-nav" role="navigation" aria-label="Main navigation">
+      <span class="section-label sidebar-section-label">Navigation</span>
+      <ul class="sidebar-menu">
+        <li class="sidebar-item">
+          <a href="dashboard.html" class="sidebar-link" id="nav-dashboard">
+            <span class="sidebar-icon">&#9783;</span>
+            <span class="sidebar-label">Dashboard</span>
+          </a>
+        </li>
+        <li class="sidebar-item">
+          <a href="form.html" class="sidebar-link" id="nav-new-record">
+            <span class="sidebar-icon">+</span>
+            <span class="sidebar-label">New Record</span>
+          </a>
+        </li>
+        <!-- Shown only for Administrators — toggled via app.js -->
+        <li class="sidebar-item" id="nav-manage-users-item">
+          <a href="manage-users.html" class="sidebar-link" id="nav-manage-users">
+            <span class="sidebar-icon">&#9707;</span>
+            <span class="sidebar-label">Manage Users</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
 
-<!-- =====================================================================
-     MAIN CONTENT
-     ===================================================================== -->
-<main class="form-layout" role="main">
+    <div class="sidebar-divider"></div>
 
-  <!-- Page header -->
-  <div class="form-page-header">
-    <h1 class="form-page-title" id="form-page-title">New Maintenance Record</h1>
-    <p class="form-page-subtitle">Complete all required fields marked with <span style="color:var(--color-danger)">*</span></p>
-  </div>
-
-  <form id="record-form" novalidate autocomplete="off" enctype="multipart/form-data">
-
-    <!-- ── Section 1: Classification ───────────────────────────────────── -->
-    <div class="section-card">
-      <div class="section-card-title">Classification</div>
-
-      <div class="row g-3">
-        <!-- Maintenance Type -->
-        <div class="col-md-4">
-          <label for="field-maintenance-type" class="form-label">
-            Maintenance Type <span class="required-star" aria-hidden="true">*</span>
-          </label>
-          <select id="field-maintenance-type" name="maintenance_type" class="form-select" required>
-            <option value="">— Select —</option>
-            <option value="Planned">Planned</option>
-            <option value="Conducted">Conducted</option>
-          </select>
-          <div id="field-maintenance-type-error" class="field-error" role="alert"></div>
-        </div>
-
-        <!-- Equipment ID -->
-        <div class="col-md-4">
-          <label for="field-equipment-id" class="form-label">
-            Equipment ID <span class="required-star" aria-hidden="true">*</span>
-          </label>
-          <input
-            type="text"
-            id="field-equipment-id"
-            name="equipment_id"
-            class="form-control"
-            placeholder="e.g. FIC-101"
-            required
-            maxlength="100"
-          />
-          <div id="field-equipment-id-error" class="field-error" role="alert"></div>
-        </div>
-
-        <!-- Date / Time -->
-        <div class="col-md-4">
-          <label for="field-date-time" class="form-label">
-            Date / Time <span class="required-star" aria-hidden="true">*</span>
-          </label>
-          <input
-            type="datetime-local"
-            id="field-date-time"
-            name="date_time"
-            class="form-control"
-            required
-          />
-          <div id="field-date-time-error" class="field-error" role="alert"></div>
+    <!-- Bottom: User Info + Logout -->
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-user-avatar" id="sidebarUserAvatar">—</div>
+        <div class="sidebar-user-info">
+          <span class="sidebar-user-name" id="sidebarUsername">—</span>
+          <span class="sidebar-user-role" id="sidebarUserRole">—</span>
         </div>
       </div>
+      <button class="sidebar-logout-btn" id="logoutBtn">Logout</button>
     </div>
 
-    <!-- ── Section 2: Personnel ─────────────────────────────────────────── -->
-    <div class="section-card">
-      <div class="section-card-title">Personnel</div>
+  </aside>
 
-      <div class="row g-3">
-        <!-- Responsible Person -->
-        <div class="col-md-6">
-          <label for="field-responsible-person" class="form-label">
-            Responsible Person <span class="required-star" aria-hidden="true">*</span>
-          </label>
-          <input
-            type="text"
-            id="field-responsible-person"
-            name="responsible_person"
-            class="form-control"
-            placeholder="Full name of responsible engineer"
-            required
-            maxlength="100"
-          />
-          <div id="field-responsible-person-error" class="field-error" role="alert"></div>
-        </div>
-      </div>
-    </div>
+  <!-- =====================================================================
+       MAIN CONTENT AREA
+       ===================================================================== -->
+  <main class="main-content" role="main">
 
-    <!-- ── Section 3: Details ───────────────────────────────────────────── -->
-    <div class="section-card">
-      <div class="section-card-title">Maintenance Details</div>
+    <!-- Top Bar -->
+    <header class="topbar">
+      <span class="topbar-title" id="topbar-page-title">New Record</span>
+      <span class="topbar-meta" id="topbar-user-meta"></span>
+    </header>
 
-      <div class="row g-3">
-        <!-- Operating Conditions -->
-        <div class="col-md-6">
-          <label for="field-operating-conditions" class="form-label">Operating Conditions</label>
-          <textarea
-            id="field-operating-conditions"
-            name="operating_conditions"
-            class="form-control"
-            rows="3"
-            placeholder="Describe the operating conditions during maintenance…"
-            maxlength="500"
-          ></textarea>
-          <div class="form-text">Max 500 characters</div>
-          <div id="field-operating-conditions-error" class="field-error" role="alert"></div>
-        </div>
+    <!-- Page Content -->
+    <div class="page-content">
 
-        <!-- Inventory / Consumables -->
-        <div class="col-md-6">
-          <label for="field-inventory-consumables" class="form-label">Inventory / Consumables</label>
-          <textarea
-            id="field-inventory-consumables"
-            name="inventory_consumables"
-            class="form-control"
-            rows="3"
-            placeholder="List parts and consumables used…"
-            maxlength="500"
-          ></textarea>
-          <div class="form-text">Max 500 characters</div>
-          <div id="field-inventory-consumables-error" class="field-error" role="alert"></div>
-        </div>
-
-        <!-- Remarks -->
-        <div class="col-12">
-          <label for="field-remarks" class="form-label">Remarks</label>
-          <textarea
-            id="field-remarks"
-            name="remarks"
-            class="form-control"
-            rows="4"
-            placeholder="Any additional remarks, observations, or follow-up actions…"
-            maxlength="2000"
-          ></textarea>
-          <div class="form-text">Max 2000 characters</div>
-          <div id="field-remarks-error" class="field-error" role="alert"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Section 4: Attachment ────────────────────────────────────────── -->
-    <div class="section-card">
-      <div class="section-card-title">Attachment</div>
-
-      <!-- Existing attachment info (shown in edit mode) -->
-      <div id="current-attachment-row" class="mb-2" style="display:none;">
-        <span class="text-muted-custom">Current attachment: </span>
-        <span id="current-attachment" style="color: var(--color-info); font-size: 0.875rem;"></span>
+      <!-- Page header -->
+      <div class="form-page-header">
+        <h1 class="form-page-title" id="form-page-title">New Maintenance Record</h1>
+        <p class="form-page-subtitle">Complete all required fields marked with <span style="color:var(--color-danger)">*</span></p>
       </div>
 
-      <div>
-        <label for="field-attachment" class="form-label">
-          Upload File
-          <span class="text-muted-custom" style="font-weight:400;">(PDF, Excel, JPG, PNG — max 10 MB)</span>
-        </label>
-        <input
-          type="file"
-          id="field-attachment"
-          name="attachment"
-          class="form-control"
-          accept=".pdf,.xlsx,.xls,.jpg,.jpeg,.png"
-        />
+      <form id="record-form" novalidate autocomplete="off" enctype="multipart/form-data">
 
-        <!-- File info row — shown after selection -->
-        <div id="file-info-row" class="file-info-row" role="status">
-          <span aria-hidden="true">📄</span>
-          <span class="file-info-name" id="file-info-name"></span>
-          <span class="file-info-size" id="file-info-size"></span>
+        <!-- ── Section 1: Classification ───────────────────────────────────── -->
+        <div class="section-card">
+          <div class="section-card-title">Classification</div>
+
+          <div class="row g-3">
+            <!-- Maintenance Type -->
+            <div class="col-md-4">
+              <label for="field-maintenance-type" class="form-label">
+                Maintenance Type <span class="required-star" aria-hidden="true">*</span>
+              </label>
+              <select id="field-maintenance-type" name="maintenance_type" class="form-select" required>
+                <option value="">— Select —</option>
+                <option value="Planned">Planned</option>
+                <option value="Conducted">Conducted</option>
+              </select>
+              <div id="field-maintenance-type-error" class="field-error" role="alert"></div>
+            </div>
+
+            <!-- Equipment ID -->
+            <div class="col-md-4">
+              <label for="field-equipment-id" class="form-label">
+                Equipment ID <span class="required-star" aria-hidden="true">*</span>
+              </label>
+              <input
+                type="text"
+                id="field-equipment-id"
+                name="equipment_id"
+                class="form-control"
+                placeholder="e.g. FIC-101"
+                required
+                maxlength="100"
+              />
+              <div id="field-equipment-id-error" class="field-error" role="alert"></div>
+            </div>
+
+            <!-- Date / Time -->
+            <div class="col-md-4">
+              <label for="field-date-time" class="form-label">
+                Date / Time <span class="required-star" aria-hidden="true">*</span>
+              </label>
+              <input
+                type="datetime-local"
+                id="field-date-time"
+                name="date_time"
+                class="form-control"
+                required
+              />
+              <div id="field-date-time-error" class="field-error" role="alert"></div>
+            </div>
+          </div>
         </div>
 
-        <!-- File validation warning -->
-        <div id="file-warning" class="file-warning mt-1" style="display:none; font-size:0.8rem;" role="alert"></div>
-        <div id="field-attachment-error" class="field-error" role="alert"></div>
-      </div>
-    </div>
+        <!-- ── Section 2: Personnel ─────────────────────────────────────────── -->
+        <div class="section-card">
+          <div class="section-card-title">Personnel</div>
 
-    <!-- ── Submit ────────────────────────────────────────────────────────── -->
-    <div class="d-flex gap-3 mt-2 mb-4">
-      <button type="submit" id="btn-submit" class="btn btn-primary-ykg px-4">
-        Save Record
-      </button>
-      <a href="dashboard.html" class="btn btn-outline-surface px-4">
-        Cancel
-      </a>
-    </div>
+          <div class="row g-3">
+            <!-- Responsible Person -->
+            <div class="col-md-6">
+              <label for="field-responsible-person" class="form-label">
+                Responsible Person <span class="required-star" aria-hidden="true">*</span>
+              </label>
+              <input
+                type="text"
+                id="field-responsible-person"
+                name="responsible_person"
+                class="form-control"
+                placeholder="Full name of responsible engineer"
+                required
+                maxlength="100"
+              />
+              <div id="field-responsible-person-error" class="field-error" role="alert"></div>
+            </div>
+          </div>
+        </div>
 
-  </form>
-</main>
+        <!-- ── Section 3: Details ───────────────────────────────────────────── -->
+        <div class="section-card">
+          <div class="section-card-title">Maintenance Details</div>
+
+          <div class="row g-3">
+            <!-- Operating Conditions -->
+            <div class="col-md-6">
+              <label for="field-operating-conditions" class="form-label">Operating Conditions</label>
+              <textarea
+                id="field-operating-conditions"
+                name="operating_conditions"
+                class="form-control"
+                rows="3"
+                placeholder="Describe the operating conditions during maintenance…"
+                maxlength="500"
+              ></textarea>
+              <div class="form-text">Max 500 characters</div>
+              <div id="field-operating-conditions-error" class="field-error" role="alert"></div>
+            </div>
+
+            <!-- Inventory / Consumables -->
+            <div class="col-md-6">
+              <label for="field-inventory-consumables" class="form-label">Inventory / Consumables</label>
+              <textarea
+                id="field-inventory-consumables"
+                name="inventory_consumables"
+                class="form-control"
+                rows="3"
+                placeholder="List parts and consumables used…"
+                maxlength="500"
+              ></textarea>
+              <div class="form-text">Max 500 characters</div>
+              <div id="field-inventory-consumables-error" class="field-error" role="alert"></div>
+            </div>
+
+            <!-- Remarks -->
+            <div class="col-12">
+              <label for="field-remarks" class="form-label">Remarks</label>
+              <textarea
+                id="field-remarks"
+                name="remarks"
+                class="form-control"
+                rows="4"
+                placeholder="Any additional remarks, observations, or follow-up actions…"
+                maxlength="2000"
+              ></textarea>
+              <div class="form-text">Max 2000 characters</div>
+              <div id="field-remarks-error" class="field-error" role="alert"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Section 4: Attachment ────────────────────────────────────────── -->
+        <div class="section-card">
+          <div class="section-card-title">Attachment</div>
+
+          <!-- Existing attachment info (shown in edit mode) -->
+          <div id="current-attachment-row" class="mb-2" style="display:none;">
+            <span class="meta-text">Current attachment: </span>
+            <span id="current-attachment" style="color: var(--color-accent); font-size: var(--font-size-sm);"></span>
+          </div>
+
+          <div>
+            <label for="field-attachment" class="form-label">
+              Upload File
+              <span class="meta-text" style="font-weight:400; text-transform:none; letter-spacing:0;">(PDF, Excel, JPG, PNG — max 10 MB)</span>
+            </label>
+            <input
+              type="file"
+              id="field-attachment"
+              name="attachment"
+              class="form-control"
+              accept=".pdf,.xlsx,.xls,.jpg,.jpeg,.png"
+            />
+
+            <!-- File info row — shown after selection -->
+            <div id="file-info-row" class="file-info-row" role="status">
+              <span aria-hidden="true">📄</span>
+              <span class="file-info-name" id="file-info-name"></span>
+              <span class="file-info-size" id="file-info-size"></span>
+            </div>
+
+            <!-- File validation warning -->
+            <div id="file-warning" class="file-warning mt-1" style="display:none; font-size:var(--font-size-xs);" role="alert"></div>
+            <div id="field-attachment-error" class="field-error" role="alert"></div>
+          </div>
+        </div>
+
+        <!-- ── Submit ────────────────────────────────────────────────────────── -->
+        <div class="d-flex gap-3 mt-2 mb-4">
+          <button type="submit" id="btn-submit" class="btn btn-primary px-4">
+            Save Record
+          </button>
+          <a href="dashboard.html" class="btn btn-secondary px-4">
+            Cancel
+          </a>
+        </div>
+
+      </form>
+    </div><!-- /.page-content -->
+
+  </main>
+
+</div><!-- /.app-shell -->
 
 <!-- Toast container -->
 <div id="toast-container" class="toast-container" aria-live="polite"></div>

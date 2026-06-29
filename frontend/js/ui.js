@@ -382,3 +382,67 @@ function showRecordDetail(record, userRole, username) {
 
   new bootstrap.Modal(modal).show();
 }
+
+// ---------------------------------------------------------------------------
+// CSV grid rendering
+// ---------------------------------------------------------------------------
+
+/**
+ * Build and return an editable CSV grid <table> element.
+ * Uses document.createElement only — never innerHTML — so no XSS risk from user data.
+ *
+ * @param {string[]}   headers    - Array of column header strings
+ * @param {string[][]} rows       - Array of data rows (each row is an array of cell strings)
+ * @param {boolean}    isEditable - If true, every <td> gets contenteditable="true"
+ * @returns {HTMLTableElement}    - The constructed table; caller appends it to the DOM
+ */
+function renderCsvGrid(headers, rows, isEditable) {
+  const table = document.createElement("table");
+  table.className = "table table-bordered table-sm csv-grid";
+  table.setAttribute("role", "grid");
+  table.setAttribute("aria-label", "CSV data grid");
+
+  // --- <thead> ---
+  const thead = document.createElement("thead");
+  const headerRow = document.createElement("tr");
+
+  headers.forEach((headerText) => {
+    const th = document.createElement("th");
+    th.scope = "col";
+    th.textContent = headerText;
+    headerRow.appendChild(th);
+  });
+
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+
+  // --- <tbody> ---
+  const tbody = document.createElement("tbody");
+
+  rows.forEach((rowData, rowIndex) => {
+    const tr = document.createElement("tr");
+
+    rowData.forEach((cellValue, colIndex) => {
+      const td = document.createElement("td");
+      td.textContent = cellValue;
+
+      if (isEditable) {
+        td.setAttribute("contenteditable", "true");
+        td.setAttribute("aria-label", `Row ${rowIndex + 1}, Column ${colIndex + 1}`);
+        // Prevent paste of HTML — handle paste as plain text
+        td.addEventListener("paste", (e) => {
+          e.preventDefault();
+          const text = (e.clipboardData || window.clipboardData).getData("text/plain");
+          document.execCommand("insertText", false, text);
+        });
+      }
+
+      tr.appendChild(td);
+    });
+
+    tbody.appendChild(tr);
+  });
+
+  table.appendChild(tbody);
+  return table;
+}

@@ -90,6 +90,50 @@ function applyNavbarRoleVisibility() {
   }
 }
 
+/**
+ * Populate the sidebar user info fields and wire the logout button.
+ * Uses textContent only — no innerHTML.
+ */
+function populateSidebar() {
+  const username = getUsername();
+  const role     = getRole();
+
+  const avatarEl = document.getElementById("sidebarUserAvatar");
+  const nameEl   = document.getElementById("sidebarUsername");
+  const roleEl   = document.getElementById("sidebarUserRole");
+
+  if (avatarEl && username) avatarEl.textContent = username.charAt(0).toUpperCase();
+  if (nameEl)  nameEl.textContent  = username || "\u2014";
+  if (roleEl)  roleEl.textContent  = role    || "\u2014";
+
+  // Show/hide Manage Users sidebar item based on role
+  const manageUsersItem = document.getElementById("nav-manage-users-item");
+  if (manageUsersItem) {
+    manageUsersItem.classList.toggle("d-none", role !== ROLES.ADMIN);
+  }
+
+  // Wire sidebar logout button
+  const logoutBtn = document.getElementById("logoutBtn");
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", () => {
+      clearSession();
+      window.location.href = "index.html";
+    });
+  }
+}
+
+/**
+ * Populate the topbar user meta string (username — role).
+ */
+function populateTopbarMeta() {
+  const username = getUsername();
+  const role     = getRole();
+  const metaEl   = document.getElementById("topbar-user-meta");
+  if (metaEl && username) {
+    metaEl.textContent = username + " \u2014 " + (role || "");
+  }
+}
+
 // ---------------------------------------------------------------------------
 // DASHBOARD PAGE
 // ---------------------------------------------------------------------------
@@ -110,6 +154,12 @@ function initDashboardPage() {
   guardPage();
   populateNavbar();
   applyNavbarRoleVisibility();
+
+  // Sidebar wiring
+  populateSidebar();
+  populateTopbarMeta();
+  const activeDash = document.getElementById("nav-dashboard");
+  if (activeDash) activeDash.classList.add("active");
 
   const role     = getRole();
   const username = getUsername();
@@ -203,7 +253,7 @@ function initDashboardPage() {
 
 /**
  * Attach click listeners to every tbody row.
- * Clicks on action buttons stop propagation so they don't open the modal.
+ * Clicks on action buttons stop propagation so they don't trigger navigation.
  */
 function attachRowClickListeners(role, username) {
   const tbody = document.getElementById("records-tbody");
@@ -212,7 +262,7 @@ function attachRowClickListeners(role, username) {
   tbody.querySelectorAll("tr").forEach((tr) => {
     const recordId = parseInt(tr.dataset.recordId, 10);
 
-    // Stop propagation on action buttons so row click doesn't trigger
+    // Stop propagation on action buttons so row click doesn't trigger navigation
     tr.querySelectorAll(".btn-action, .attachment-link").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -220,10 +270,7 @@ function attachRowClickListeners(role, username) {
     });
 
     tr.addEventListener("click", () => {
-      const record = _recordsMap[recordId];
-      if (record) {
-        showRecordDetail(record, role, username);
-      }
+      window.location.href = `record-detail.html?id=${recordId}`;
     });
   });
 }
@@ -275,9 +322,15 @@ async function initFormPage() {
   populateNavbar();
   applyNavbarRoleVisibility();
 
+  // Sidebar wiring
+  populateSidebar();
+  populateTopbarMeta();
+  const activeForm = document.getElementById("nav-new-record");
+  if (activeForm) activeForm.classList.add("active");
+
   const role = getRole();
 
-  // Logout
+  // Logout (legacy navbar button — kept for compatibility)
   const logoutBtn = document.getElementById("btn-logout");
   if (logoutBtn) {
     logoutBtn.addEventListener("click", () => logout());
@@ -472,7 +525,13 @@ async function initManageUsersPage() {
   populateNavbar();
   applyNavbarRoleVisibility();
 
-  // Logout
+  // Sidebar wiring
+  populateSidebar();
+  populateTopbarMeta();
+  const activeManage = document.getElementById("nav-manage-users");
+  if (activeManage) activeManage.classList.add("active");
+
+  // Logout (legacy navbar button — kept for compatibility)
   const logoutBtn = document.getElementById("btn-logout");
   if (logoutBtn) {
     logoutBtn.addEventListener("click", () => logout());
@@ -540,6 +599,325 @@ async function initManageUsersPage() {
 }
 
 // ---------------------------------------------------------------------------
+// RECORD DETAIL PAGE
+// ---------------------------------------------------------------------------
+
+/** Module-level state for the CSV grid on the detail page. */
+let _originalCsvData  = null;  // deep copy at load / after save
+let _currentCsvData   = null;  // live working state
+let _hasUnsavedChanges = false;
+let _recordDetailId   = null;
+
+/**
+ * Initialize the record detail page.
+ * Detects page by checking for #recordDetailPage.
+ */
+async function initRecordDetailPage() {
+  if (!document.getElementById("recordDetailPage")) return;
+
+  guardPage();
+  populateNavbar();
+  applyNavbarRoleVisibility();
+
+  // Sidebar wiring
+  populateSidebar();
+  populateTopbarMeta();
+  // No specific nav item is active on the detail page (it's a drill-down)
+
+  const role     = getRole();
+  const username = getUsername();
+
+  // Logout (legacy navbar button — kept for compatibility)
+  const logoutBtn = document.getElementById("btn-logout");
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", () => logout());
+  }
+
+  // Read record id from URL
+  const params   = new URLSearchParams(window.location.search);
+  const rawId    = params.get("id");
+  const recordId = rawId ? parseInt(rawId, 10) : null;
+  if (!recordId || isNaN(recordId) || recordId <= 0) {
+    window.location.replace("dashboard.html");
+    return;
+  }
+  _recordDetailId = recordId;
+
+  // --- Load record ---
+  let record = null;
+  try {
+    const records = await getRecords({});
+    record = records.find((r) => r.id === recordId) || null;
+    if (!record) {
+      showToast("Record not found.", "error");
+      setTimeout(() => window.location.replace("dashboard.html"), 2000);
+      return;
+    }
+  } catch (err) {
+    showToast(err.message || "Failed to load record.", "error");
+    return;
+  }
+
+  // --- Section 1: Populate record fields ---
+  _populateDetailFields(record);
+
+  // Populate the record header strip with equipment ID
+  const headerIdEl   = document.getElementById("detail-header-id");
+  const headerEqpEl  = document.getElementById("detail-header-equipment");
+  if (headerIdEl)  headerIdEl.textContent  = "REC-" + record.id;
+  if (headerEqpEl) headerEqpEl.textContent = record.equipment_id || "\u2014";
+
+  // Show/hide Edit Record button
+  const editBtn = document.getElementById("detail-edit-btn");
+  if (editBtn) {
+    const canEdit = (role === ROLES.ADMIN) || (role === ROLES.ENGINEER && record.created_by === username);
+    if (canEdit) {
+      editBtn.classList.remove("d-none");
+      editBtn.setAttribute("href", `form.html?id=${recordId}`);
+    } else {
+      editBtn.classList.add("d-none");
+    }
+  }
+
+  // --- Section 2: CSV buttons role visibility ---
+  const btnUpload   = document.getElementById("btn-csv-upload");
+  const btnSave     = document.getElementById("btn-csv-save");
+  const btnUndo     = document.getElementById("btn-csv-undo");
+  const btnDownload = document.getElementById("btn-csv-download");
+
+  const isViewer = (role === ROLES.VIEWER);
+
+  if (isViewer) {
+    if (btnUpload)   btnUpload.classList.add("d-none");
+    if (btnSave)     btnSave.classList.add("d-none");
+    if (btnUndo)     btnUndo.classList.add("d-none");
+  } else {
+    if (btnUpload)   btnUpload.classList.remove("d-none");
+    if (btnSave)   { btnSave.classList.remove("d-none");   btnSave.disabled  = true; }
+    if (btnUndo)   { btnUndo.classList.remove("d-none");   btnUndo.disabled  = true; }
+  }
+
+  // Download always hidden initially until we confirm CSV exists
+  if (btnDownload) btnDownload.classList.add("d-none");
+
+  // --- Attempt to load existing CSV data ---
+  try {
+    const csvData = await getCsvData(recordId);
+    // Success — CSV exists
+    _originalCsvData  = JSON.parse(JSON.stringify(csvData));
+    _currentCsvData   = JSON.parse(JSON.stringify(csvData));
+    _renderGrid(csvData.headers, csvData.rows, !isViewer);
+    _hideCsvPlaceholder();
+    if (btnDownload) btnDownload.classList.remove("d-none");
+  } catch (err) {
+    if (err.message && err.message.includes("404")) {
+      // No CSV uploaded yet — show placeholder
+      _showCsvPlaceholder();
+    } else {
+      // Unexpected error — show placeholder and toast
+      showToast(err.message || "Failed to load CSV data.", "error");
+      _showCsvPlaceholder();
+    }
+  }
+
+  // --- Wire Upload button ---
+  const csvFileInput = document.getElementById("csvFileInput");
+  if (btnUpload && csvFileInput) {
+    btnUpload.addEventListener("click", () => {
+      csvFileInput.click();
+    });
+
+    csvFileInput.addEventListener("change", async () => {
+      const file = csvFileInput.files[0];
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append("csv_file", file);
+
+      setLoading(btnUpload, true);
+      try {
+        const result = await uploadCsv(recordId, formData);
+        _originalCsvData  = JSON.parse(JSON.stringify({ headers: result.headers, rows: result.rows }));
+        _currentCsvData   = JSON.parse(JSON.stringify({ headers: result.headers, rows: result.rows }));
+        _hasUnsavedChanges = false;
+        _renderGrid(result.headers, result.rows, !isViewer);
+        _hideCsvPlaceholder();
+        if (btnDownload) btnDownload.classList.remove("d-none");
+        if (btnSave)     btnSave.disabled  = true;
+        if (btnUndo)     btnUndo.disabled  = true;
+        showToast(`CSV uploaded successfully. ${result.row_count} rows, ${result.col_count} columns.`, "success");
+      } catch (err) {
+        showToast(err.message || "Failed to upload CSV.", "error");
+      } finally {
+        setLoading(btnUpload, false);
+        csvFileInput.value = "";
+      }
+    });
+  }
+
+  // --- Wire Save button ---
+  if (btnSave) {
+    btnSave.addEventListener("click", async () => {
+      if (!_currentCsvData) return;
+      setLoading(btnSave, true);
+      try {
+        const saved = await saveCsvData(recordId, _currentCsvData);
+        _originalCsvData  = JSON.parse(JSON.stringify({ headers: saved.headers, rows: saved.rows }));
+        _hasUnsavedChanges = false;
+        if (btnSave) btnSave.disabled = true;
+        if (btnUndo) btnUndo.disabled = true;
+        showToast("CSV changes saved successfully.", "success");
+      } catch (err) {
+        showToast(err.message || "Failed to save CSV data.", "error");
+      } finally {
+        setLoading(btnSave, false);
+      }
+    });
+  }
+
+  // --- Wire Undo button ---
+  if (btnUndo) {
+    btnUndo.addEventListener("click", () => {
+      if (!_originalCsvData) return;
+      _currentCsvData    = JSON.parse(JSON.stringify(_originalCsvData));
+      _hasUnsavedChanges = false;
+      _renderGrid(_originalCsvData.headers, _originalCsvData.rows, !isViewer);
+      if (btnSave) btnSave.disabled = true;
+      if (btnUndo) btnUndo.disabled = true;
+    });
+  }
+
+  // --- Wire Download button ---
+  if (btnDownload) {
+    btnDownload.addEventListener("click", async () => {
+      try {
+        await downloadCsv(recordId);
+      } catch (err) {
+        showToast(err.message || "Failed to download CSV.", "error");
+      }
+    });
+  }
+
+  // --- beforeunload guard ---
+  window.addEventListener("beforeunload", (e) => {
+    if (_hasUnsavedChanges) {
+      e.preventDefault();
+      e.returnValue = "You have unsaved changes. Leave anyway?";
+    }
+  });
+}
+
+/**
+ * Populate Section 1 record fields using textContent / setAttribute only.
+ * @param {object} record
+ */
+function _populateDetailFields(record) {
+  const nullish = (v) => (v !== null && v !== undefined && v !== "") ? v : "\u2014";
+  const set = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = nullish(value);
+  };
+
+  set("detail-id",                    record.id);
+  set("detail-maintenance-type",      record.maintenance_type);
+  set("detail-equipment-id",          record.equipment_id);
+  set("detail-responsible-person",    record.responsible_person);
+  set("detail-operating-conditions",  record.operating_conditions);
+  set("detail-inventory-consumables", record.inventory_consumables);
+  set("detail-remarks",               record.remarks);
+  set("detail-created-by",            record.created_by);
+  set("detail-created-date",          record.created_date);
+  set("detail-updated-by",            record.updated_by);
+  set("detail-updated-date",          record.updated_date);
+
+  // Format datetime
+  if (record.date_time) {
+    const dt = new Date(record.date_time);
+    const formatted = isNaN(dt.getTime())
+      ? record.date_time
+      : dt.toLocaleString("en-GB", {
+          day: "2-digit", month: "short", year: "numeric",
+          hour: "2-digit", minute: "2-digit",
+        });
+    const dtEl = document.getElementById("detail-date-time");
+    if (dtEl) dtEl.textContent = formatted;
+  } else {
+    set("detail-date-time", null);
+  }
+
+  // Attachment — use setAttribute, never innerHTML
+  const attachEl = document.getElementById("detail-attachment");
+  if (attachEl) {
+    attachEl.textContent = "";
+    if (record.attachment_original_name) {
+      const link = document.createElement("a");
+      link.setAttribute("href", "#");
+      link.textContent = record.attachment_original_name;
+      link.className = "attachment-link";
+      link.addEventListener("click", (e) => {
+        e.preventDefault();
+        handleDownload(e, record.id, record.attachment_original_name);
+      });
+      attachEl.appendChild(link);
+    } else {
+      attachEl.textContent = "\u2014";
+    }
+  }
+}
+
+/**
+ * Render (or re-render) the CSV grid inside the csv-grid-container.
+ * @param {string[]} headers
+ * @param {string[][]} rows
+ * @param {boolean} isEditable
+ */
+function _renderGrid(headers, rows, isEditable) {
+  const container = document.getElementById("csv-grid-container");
+  if (!container) return;
+
+  // Remove any existing grid
+  const existing = container.querySelector(".csv-grid-wrapper");
+  if (existing) existing.remove();
+
+  const table   = renderCsvGrid(headers, rows, isEditable);
+  const wrapper = document.createElement("div");
+  wrapper.className = "csv-grid-wrapper";
+  wrapper.appendChild(table);
+  container.appendChild(wrapper);
+
+  if (isEditable) {
+    // Listen for input events on editable cells
+    table.addEventListener("input", (e) => {
+      if (e.target.tagName !== "TD") return;
+      const btnSave = document.getElementById("btn-csv-save");
+      const btnUndo = document.getElementById("btn-csv-undo");
+
+      // Read all cell values back from the DOM into _currentCsvData
+      const trs = table.querySelectorAll("tbody tr");
+      _currentCsvData.rows = Array.from(trs).map((tr) =>
+        Array.from(tr.querySelectorAll("td")).map((td) => td.textContent)
+      );
+
+      _hasUnsavedChanges = true;
+      if (btnSave) btnSave.disabled = false;
+      if (btnUndo) btnUndo.disabled = false;
+    });
+  }
+}
+
+/** Show the no-CSV placeholder. */
+function _showCsvPlaceholder() {
+  const placeholder = document.getElementById("csv-placeholder");
+  if (placeholder) placeholder.classList.remove("d-none");
+}
+
+/** Hide the no-CSV placeholder. */
+function _hideCsvPlaceholder() {
+  const placeholder = document.getElementById("csv-placeholder");
+  if (placeholder) placeholder.classList.add("d-none");
+}
+
+// ---------------------------------------------------------------------------
 // Bootstrap — auto-detect and initialize the correct page
 // ---------------------------------------------------------------------------
 
@@ -548,4 +926,5 @@ document.addEventListener("DOMContentLoaded", () => {
   initDashboardPage();
   initFormPage();
   initManageUsersPage();
+  initRecordDetailPage();
 });

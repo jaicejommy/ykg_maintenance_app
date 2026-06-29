@@ -3,172 +3,204 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="E-LogBook Maintenance System — manage user accounts (Administrator only)." />
+  <meta name="description" content="Maintenance Management System — manage user accounts (Administrator only)." />
   <title>Manage Users — Maintenance Management System</title>
   <link rel="stylesheet" href="css/bootstrap.min.css" />
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
 
-<!-- =====================================================================
-     NAVIGATION BAR
-     ===================================================================== -->
-<nav class="app-navbar" role="navigation" aria-label="Main navigation">
-  <div class="navbar-brand-area">
-    <a href="dashboard.html" class="btn-back-nav" aria-label="Back to dashboard">
-      &larr; Back
-    </a>
-    <div class="navbar-red-line" aria-hidden="true"></div>
-    <div>
-      <div class="app-title">Maintenance Management System</div>
-      <div class="app-subtitle">E-LogBook</div>
+<div class="app-shell">
+
+  <!-- =====================================================================
+       FIXED LEFT SIDEBAR
+       ===================================================================== -->
+  <aside class="sidebar" id="sidebar">
+
+    <!-- Logo / App Identity -->
+    <div class="sidebar-brand">
+      <span class="sidebar-brand-mark">MMS</span>
+      <span class="sidebar-brand-label">Maintenance<br>Management</span>
     </div>
-  </div>
 
-  <!-- Manage Users — active on this page -->
-  <a
-    id="nav-manage-users"
-    href="manage-users.html"
-    class="nav-text-link active d-none"
-    aria-label="Manage Users"
-    aria-current="page"
-  >Manage Users</a>
+    <div class="sidebar-divider"></div>
 
-  <div class="navbar-user-info">
-    <div class="user-badge" aria-label="Logged in user">
-      <div class="user-avatar" id="navbar-avatar-initials" aria-hidden="true">U</div>
-      <div class="user-details">
-        <div class="user-name" id="navbar-username">—</div>
-        <div class="user-role-badge" id="navbar-role">—</div>
+    <!-- Primary Navigation -->
+    <nav class="sidebar-nav" role="navigation" aria-label="Main navigation">
+      <span class="section-label sidebar-section-label">Navigation</span>
+      <ul class="sidebar-menu">
+        <li class="sidebar-item">
+          <a href="dashboard.html" class="sidebar-link" id="nav-dashboard">
+            <span class="sidebar-icon">&#9783;</span>
+            <span class="sidebar-label">Dashboard</span>
+          </a>
+        </li>
+        <li class="sidebar-item">
+          <a href="form.html" class="sidebar-link" id="nav-new-record">
+            <span class="sidebar-icon">+</span>
+            <span class="sidebar-label">New Record</span>
+          </a>
+        </li>
+        <!-- Shown only for Administrators — toggled via app.js -->
+        <li class="sidebar-item" id="nav-manage-users-item">
+          <a href="manage-users.html" class="sidebar-link" id="nav-manage-users">
+            <span class="sidebar-icon">&#9707;</span>
+            <span class="sidebar-label">Manage Users</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="sidebar-divider"></div>
+
+    <!-- Bottom: User Info + Logout -->
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-user-avatar" id="sidebarUserAvatar">—</div>
+        <div class="sidebar-user-info">
+          <span class="sidebar-user-name" id="sidebarUsername">—</span>
+          <span class="sidebar-user-role" id="sidebarUserRole">—</span>
+        </div>
       </div>
+      <button class="sidebar-logout-btn" id="logoutBtn">Logout</button>
     </div>
-    <button id="btn-logout" class="btn btn-logout" type="button" aria-label="Logout">
-      Logout
-    </button>
-  </div>
-</nav>
 
-<!-- =====================================================================
-     MAIN CONTENT
-     ===================================================================== -->
-<main class="form-layout" role="main">
+  </aside>
 
-  <!-- Page header -->
-  <div class="form-page-header">
-    <h1 class="form-page-title">Manage Users</h1>
-    <p class="form-page-subtitle">Create new user accounts. Administrator accounts are provisioned by the system owner only.</p>
-  </div>
+  <!-- =====================================================================
+       MAIN CONTENT AREA
+       ===================================================================== -->
+  <main class="main-content" role="main">
 
-  <!-- ── Create User Form ──────────────────────────────────────────────── -->
-  <div class="section-card mb-4">
-    <div class="section-card-title">Create New User</div>
+    <!-- Top Bar -->
+    <header class="topbar">
+      <span class="topbar-title" id="topbar-page-title">Manage Users</span>
+      <span class="topbar-meta" id="topbar-user-meta"></span>
+    </header>
 
-    <form id="create-user-form" novalidate autocomplete="off">
+    <!-- Page Content -->
+    <div class="page-content">
 
-      <div class="row g-3">
-        <!-- Username -->
-        <div class="col-md-6">
-          <label for="new-username" class="form-label">
-            Username <span class="required-star" aria-hidden="true">*</span>
-          </label>
-          <input
-            type="text"
-            id="new-username"
-            name="username"
-            class="form-control"
-            placeholder="e.g. john_doe"
-            required
-            maxlength="50"
-            autocomplete="off"
-          />
-          <div id="new-username-error" class="field-error" role="alert"></div>
-        </div>
+      <!-- Page header -->
+      <div class="form-page-header">
+        <h1 class="form-page-title">Manage Users</h1>
+        <p class="form-page-subtitle">Create new user accounts. Administrator accounts are provisioned by the system owner only.</p>
+      </div>
 
-        <!-- Role -->
-        <div class="col-md-6">
-          <label for="new-role" class="form-label">
-            Role <span class="required-star" aria-hidden="true">*</span>
-          </label>
-          <select id="new-role" name="role" class="form-select" required>
-            <option value="">— Select Role —</option>
-            <option value="Engineer / Operator">Engineer / Operator</option>
-            <option value="Viewer">Viewer</option>
-          </select>
-          <div id="new-role-error" class="field-error" role="alert"></div>
-        </div>
+      <!-- ── Create User Form ──────────────────────────────────────────────── -->
+      <div class="section-card mb-4">
+        <div class="section-card-title">Create New User</div>
 
-        <!-- Password -->
-        <div class="col-md-6">
-          <label for="new-password" class="form-label">
-            Password <span class="required-star" aria-hidden="true">*</span>
-          </label>
-          <input
-            type="password"
-            id="new-password"
-            name="password"
-            class="form-control"
-            placeholder="Min. 8 characters"
-            required
-            autocomplete="new-password"
-          />
-          <div id="new-password-error" class="field-error" role="alert"></div>
-        </div>
+        <form id="create-user-form" novalidate autocomplete="off">
 
-        <!-- Confirm Password -->
-        <div class="col-md-6">
-          <label for="new-confirm-password" class="form-label">
-            Confirm Password <span class="required-star" aria-hidden="true">*</span>
-          </label>
-          <input
-            type="password"
-            id="new-confirm-password"
-            name="confirm_password"
-            class="form-control"
-            placeholder="Repeat password"
-            required
-            autocomplete="new-password"
-          />
-          <div id="new-confirm-password-error" class="field-error" role="alert"></div>
+          <div class="row g-3">
+            <!-- Username -->
+            <div class="col-md-6">
+              <label for="new-username" class="form-label">
+                Username <span class="required-star" aria-hidden="true">*</span>
+              </label>
+              <input
+                type="text"
+                id="new-username"
+                name="username"
+                class="form-control"
+                placeholder="e.g. john_doe"
+                required
+                maxlength="50"
+                autocomplete="off"
+              />
+              <div id="new-username-error" class="field-error" role="alert"></div>
+            </div>
+
+            <!-- Role -->
+            <div class="col-md-6">
+              <label for="new-role" class="form-label">
+                Role <span class="required-star" aria-hidden="true">*</span>
+              </label>
+              <select id="new-role" name="role" class="form-select" required>
+                <option value="">— Select Role —</option>
+                <option value="Engineer / Operator">Engineer / Operator</option>
+                <option value="Viewer">Viewer</option>
+              </select>
+              <div id="new-role-error" class="field-error" role="alert"></div>
+            </div>
+
+            <!-- Password -->
+            <div class="col-md-6">
+              <label for="new-password" class="form-label">
+                Password <span class="required-star" aria-hidden="true">*</span>
+              </label>
+              <input
+                type="password"
+                id="new-password"
+                name="password"
+                class="form-control"
+                placeholder="Min. 8 characters"
+                required
+                autocomplete="new-password"
+              />
+              <div id="new-password-error" class="field-error" role="alert"></div>
+            </div>
+
+            <!-- Confirm Password -->
+            <div class="col-md-6">
+              <label for="new-confirm-password" class="form-label">
+                Confirm Password <span class="required-star" aria-hidden="true">*</span>
+              </label>
+              <input
+                type="password"
+                id="new-confirm-password"
+                name="confirm_password"
+                class="form-control"
+                placeholder="Repeat password"
+                required
+                autocomplete="new-password"
+              />
+              <div id="new-confirm-password-error" class="field-error" role="alert"></div>
+            </div>
+          </div>
+
+          <div class="d-flex gap-3 mt-3">
+            <button type="submit" id="btn-create-user" class="btn btn-primary px-4">
+              Create User
+            </button>
+            <a href="dashboard.html" class="btn btn-secondary px-4">Cancel</a>
+          </div>
+
+        </form>
+      </div>
+
+      <!-- ── Existing Users Table ──────────────────────────────────────────── -->
+      <div class="section-card">
+        <div class="section-card-title">Existing Users</div>
+
+        <div class="records-table-wrapper">
+          <table class="records-table" role="grid" aria-label="Existing user accounts">
+            <thead>
+              <tr>
+                <th scope="col">#</th>
+                <th scope="col">Username</th>
+                <th scope="col">Role</th>
+                <th scope="col">Status</th>
+              </tr>
+            </thead>
+            <tbody id="users-tbody" aria-live="polite">
+              <!-- Rows injected by app.js renderUsersTable() -->
+            </tbody>
+          </table>
+
+          <!-- Empty state -->
+          <div id="users-empty-state" class="empty-state" style="display: none;" role="status" aria-live="polite">
+            <p class="empty-state-text">No user accounts found.</p>
+          </div>
         </div>
       </div>
 
-      <div class="d-flex gap-3 mt-3">
-        <button type="submit" id="btn-create-user" class="btn btn-primary-ykg px-4">
-          Create User
-        </button>
-        <a href="dashboard.html" class="btn btn-outline-surface px-4">Cancel</a>
-      </div>
+    </div><!-- /.page-content -->
 
-    </form>
-  </div>
+  </main>
 
-  <!-- ── Existing Users Table ──────────────────────────────────────────── -->
-  <div class="section-card">
-    <div class="section-card-title">Existing Users</div>
-
-    <div class="records-table-wrapper">
-      <table class="records-table" role="grid" aria-label="Existing user accounts">
-        <thead>
-          <tr>
-            <th scope="col">#</th>
-            <th scope="col">Username</th>
-            <th scope="col">Role</th>
-            <th scope="col">Status</th>
-          </tr>
-        </thead>
-        <tbody id="users-tbody" aria-live="polite">
-          <!-- Rows injected by app.js renderUsersTable() -->
-        </tbody>
-      </table>
-
-      <!-- Empty state -->
-      <div id="users-empty-state" class="empty-state" style="display: none;" role="status" aria-live="polite">
-        <p class="empty-state-text">No user accounts found.</p>
-      </div>
-    </div>
-  </div>
-
-</main>
+</div><!-- /.app-shell -->
 
 <!-- Toast container -->
 <div id="toast-container" class="toast-container" aria-live="polite"></div>
