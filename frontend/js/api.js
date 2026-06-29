@@ -236,3 +236,106 @@ async function downloadAttachment(id, filename) {
     document.body.removeChild(anchor);
   }, 100);
 }
+
+// ---------------------------------------------------------------------------
+// CSV data
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch CSV data for a record.
+ * Returns { headers: string[], rows: string[][] } or throws on non-2xx.
+ * @param {number} recordId
+ * @returns {Promise<{headers: string[], rows: string[][]}>}
+ */
+async function getCsvData(recordId) {
+  const response = await fetch(`${API_BASE}/api/csv/${recordId}`, {
+    method: "GET",
+    headers: buildAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    await throwResponseError(response);
+  }
+  return response.json();
+}
+
+/**
+ * Upload a CSV file for a record (multipart/form-data).
+ * @param {number} recordId
+ * @param {FormData} formData - must include field "csv_file"
+ * @returns {Promise<{headers: string[], rows: string[][], row_count: number, col_count: number}>}
+ */
+async function uploadCsv(recordId, formData) {
+  const response = await fetch(`${API_BASE}/api/csv/${recordId}`, {
+    method: "POST",
+    headers: buildAuthHeaders(), // Do NOT set Content-Type — browser sets multipart boundary
+    body: formData,
+  });
+
+  if (!response.ok) {
+    await throwResponseError(response);
+  }
+  return response.json();
+}
+
+/**
+ * Save edited CSV grid data for a record.
+ * @param {number} recordId
+ * @param {{ headers: string[], rows: string[][] }} data
+ * @returns {Promise<{headers: string[], rows: string[][]}>}
+ */
+async function saveCsvData(recordId, data) {
+  const response = await fetch(`${API_BASE}/api/csv/${recordId}`, {
+    method: "PUT",
+    headers: {
+      ...buildAuthHeaders(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    await throwResponseError(response);
+  }
+  return response.json();
+}
+
+/**
+ * Download the CSV file for a record.
+ * Checks response.ok before reading as Blob; surfaces error detail if not ok.
+ * Creates a temporary <a> element, triggers click, then immediately revokes the object URL.
+ * @param {number} recordId
+ */
+async function downloadCsv(recordId) {
+  const response = await fetch(`${API_BASE}/api/csv/${recordId}/download`, {
+    method: "GET",
+    headers: buildAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    // Read error as JSON to extract the detail message
+    let detail = `HTTP ${response.status}: ${response.statusText}`;
+    try {
+      const body = await response.json();
+      if (body && body.detail) detail = body.detail;
+    } catch (_) {
+      // ignore JSON parse failure
+    }
+    throw new Error(detail);
+  }
+
+  const blob      = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const filename  = `record_${recordId}_data.csv`;
+
+  const anchor = document.createElement("a");
+  anchor.setAttribute("href", objectUrl);
+  anchor.setAttribute("download", filename);
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
+  anchor.click();
+
+  // Revoke immediately after click
+  URL.revokeObjectURL(objectUrl);
+  document.body.removeChild(anchor);
+}

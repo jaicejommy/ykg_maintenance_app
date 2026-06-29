@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Maintenance Management System — full record detail with CSV data editor." />
+  <title>Record Detail — Maintenance Management System</title>
+  <link rel="stylesheet" href="css/bootstrap.min.css" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<div class="app-shell">
+
+  <aside class="sidebar" id="sidebar">
+
+    <!-- Logo / App Identity -->
+    <div class="sidebar-brand">
+      <span class="sidebar-brand-mark">MMS</span>
+      <span class="sidebar-brand-label">Maintenance<br>Management</span>
+    </div>
+
+    <div class="sidebar-divider"></div>
+
+    <!-- Primary Navigation -->
+    <nav class="sidebar-nav" role="navigation" aria-label="Main navigation">
+      <span class="section-label sidebar-section-label">Navigation</span>
+      <ul class="sidebar-menu">
+        <li class="sidebar-item">
+          <a href="dashboard.html" class="sidebar-link" id="nav-dashboard">
+            <span class="sidebar-icon">&#9783;</span>
+            <span class="sidebar-label">Dashboard</span>
+          </a>
+        </li>
+        <li class="sidebar-item">
+          <a href="form.html" class="sidebar-link" id="nav-new-record">
+            <span class="sidebar-icon">+</span>
+            <span class="sidebar-label">New Record</span>
+          </a>
+        </li>
+        <!-- Shown only for Administrators — toggled via app.js -->
+        <li class="sidebar-item" id="nav-manage-users-item">
+          <a href="manage-users.html" class="sidebar-link" id="nav-manage-users">
+            <span class="sidebar-icon">&#9707;</span>
+            <span class="sidebar-label">Manage Users</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="sidebar-divider"></div>
+
+    <!-- Bottom: User Info + Logout -->
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-user-avatar" id="sidebarUserAvatar">—</div>
+        <div class="sidebar-user-info">
+          <span class="sidebar-user-name" id="sidebarUsername">—</span>
+          <span class="sidebar-user-role" id="sidebarUserRole">—</span>
+        </div>
+      </div>
+      <button class="sidebar-logout-btn" id="logoutBtn">Logout</button>
+    </div>
+
+  </aside>
+
+  <!-- =====================================================================
+       MAIN CONTENT AREA
+       ===================================================================== -->
+  <main class="main-content" id="recordDetailPage" role="main">
+
+    <!-- Top Bar -->
+    <header class="topbar">
+      <span class="topbar-title" id="topbar-page-title">Record Details</span>
+      <span class="topbar-meta" id="topbar-user-meta"></span>
+    </header>
+
+    <!-- Page Content -->
+    <div class="page-content">
+
+      <!-- ── Record Header Strip ─────────────────────────────────────────── -->
+      <div class="record-header-strip">
+        <div>
+          <div class="record-header-id" id="detail-header-id">REC-—</div>
+          <div class="record-header-equipment" id="detail-header-equipment">—</div>
+        </div>
+        <div class="record-header-meta">
+          <!-- Edit Record button — hidden or shown by app.js based on role/ownership -->
+          <a
+            id="detail-edit-btn"
+            href="#"
+            class="btn btn-primary d-none"
+            role="button"
+            aria-label="Edit this record"
+          >Edit Record</a>
+        </div>
+      </div>
+
+      <!-- ── Two-column layout ───────────────────────────────────────────── -->
+      <div class="detail-layout">
+
+        <!-- Left column (60%) -->
+        <div class="detail-col">
+
+          <!-- Identification panel -->
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-header-title">Identification</span>
+            </div>
+            <div class="panel-body">
+              <dl class="definition-grid detail-dl">
+                <dt class="detail-dt">Record ID</dt>
+                <dd class="detail-dd" id="detail-id">—</dd>
+
+                <dt class="detail-dt">Maintenance Type</dt>
+                <dd class="detail-dd" id="detail-maintenance-type">—</dd>
+
+                <dt class="detail-dt">Equipment ID</dt>
+                <dd class="detail-dd" id="detail-equipment-id">—</dd>
+
+                <dt class="detail-dt">Date / Time</dt>
+                <dd class="detail-dd" id="detail-date-time">—</dd>
+
+                <dt class="detail-dt">Responsible Person</dt>
+                <dd class="detail-dd" id="detail-responsible-person">—</dd>
+              </dl>
+            </div>
+          </div>
+
+          <!-- Activity Details panel -->
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-header-title">Activity Details</span>
+            </div>
+            <div class="panel-body">
+              <dl class="definition-grid detail-dl">
+                <dt class="detail-dt">Operating Conditions</dt>
+                <dd class="detail-dd" id="detail-operating-conditions">—</dd>
+
+                <dt class="detail-dt">Inventory / Consumables</dt>
+                <dd class="detail-dd" id="detail-inventory-consumables">—</dd>
+              </dl>
+            </div>
+          </div>
+
+          <!-- Remarks panel -->
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-header-title">Remarks</span>
+            </div>
+            <div class="panel-body">
+              <div id="detail-remarks" style="font-size: var(--font-size-base); color: var(--color-text-primary); line-height: 1.6; white-space: pre-wrap;">—</div>
+            </div>
+          </div>
+
+        </div><!-- /.detail-col (left) -->
+
+        <!-- Right column (40%) -->
+        <div class="detail-col">
+
+          <!-- Audit Trail panel -->
+          <div class="panel audit-trail-panel">
+            <div class="panel-header">
+              <span class="panel-header-title">Audit Trail</span>
+            </div>
+            <div class="panel-body">
+              <dl class="definition-grid detail-dl">
+                <dt class="detail-dt">Created By</dt>
+                <dd class="detail-dd" id="detail-created-by">—</dd>
+
+                <dt class="detail-dt">Created Date</dt>
+                <dd class="detail-dd" id="detail-created-date">—</dd>
+
+                <dt class="detail-dt">Updated By</dt>
+                <dd class="detail-dd" id="detail-updated-by">—</dd>
+
+                <dt class="detail-dt">Updated Date</dt>
+                <dd class="detail-dd" id="detail-updated-date">—</dd>
+              </dl>
+            </div>
+          </div>
+
+          <!-- Attachment panel -->
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-header-title">Attachment</span>
+            </div>
+            <div class="panel-body">
+              <dd class="detail-dd" id="detail-attachment" style="display:block;">—</dd>
+            </div>
+          </div>
+
+        </div><!-- /.detail-col (right) -->
+
+      </div><!-- /.detail-layout -->
+
+      <!-- ── CSV Data Panel (full width) ────────────────────────────────── -->
+      <div class="detail-section-card">
+        <div class="detail-section-header">
+          <h2 class="detail-section-title" style="font-size: 1rem;">CSV Data</h2>
+          <div class="detail-section-actions" role="group" aria-label="CSV actions">
+            <!-- Upload CSV — hidden for Viewers -->
+            <button
+              id="btn-csv-upload"
+              type="button"
+              class="btn btn-secondary d-none"
+              aria-label="Upload CSV file"
+            >&#8679; Upload CSV</button>
+
+            <!-- Save Changes — hidden for Viewers; disabled until a cell is edited -->
+            <button
+              id="btn-csv-save"
+              type="button"
+              class="btn btn-primary d-none"
+              disabled
+              aria-label="Save CSV changes"
+            >Save Changes</button>
+
+            <!-- Undo Changes — disabled until a cell is edited -->
+            <button
+              id="btn-csv-undo"
+              type="button"
+              class="btn btn-secondary d-none"
+              disabled
+              aria-label="Undo CSV changes"
+            >Undo Changes</button>
+
+            <!-- Download CSV — hidden until CSV data exists -->
+            <button
+              id="btn-csv-download"
+              type="button"
+              class="btn btn-secondary d-none"
+              aria-label="Download CSV file"
+            >&#8681; Download CSV</button>
+          </div>
+        </div>
+
+        <!-- Hidden file input — triggered programmatically by Upload button -->
+        <input
+          type="file"
+          id="csvFileInput"
+          accept=".csv"
+          style="display: none;"
+          aria-hidden="true"
+        />
+
+        <!-- CSV placeholder — shown when no CSV data exists -->
+        <div id="csv-placeholder" class="csv-empty-state" aria-live="polite">
+          <div class="csv-empty-state-icon" aria-hidden="true">&#128196;</div>
+          <p class="mb-0">No CSV data uploaded for this record.</p>
+          <p class="meta-text" style="font-size: var(--font-size-sm);">
+            Use the <strong>Upload CSV</strong> button above to attach a CSV file.
+          </p>
+        </div>
+
+        <!-- CSV grid container — populated by app.js _renderGrid() -->
+        <div id="csv-grid-container" aria-live="polite"></div>
+      </div>
+
+    </div><!-- /.page-content -->
+
+  </main>
+
+</div><!-- /.app-shell -->
+
+<!-- Toast container -->
+<div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+<script src="js/bootstrap.bundle.min.js"></script>
+<script src="js/constants.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/api.js"></script>
+<script src="js/validators.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
