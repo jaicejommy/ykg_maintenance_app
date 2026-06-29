@@ -122,3 +122,58 @@ function validateRole(value) {
   }
   return { valid: true, message: "" };
 }
+
+/**
+ * Validate a username for the user-management form.
+ * Required, max 50 chars, only alphanumeric characters and underscores.
+ * @param {string} value
+ * @returns {{ valid: boolean, message: string }}
+ */
+function validateUsername(value) {
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  if (!trimmed) {
+    return { valid: false, message: "Username is required." };
+  }
+  if (trimmed.length > 50) {
+    return { valid: false, message: "Username must be at most 50 characters." };
+  }
+  if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) {
+    return {
+      valid: false,
+      message: "Username may only contain letters, numbers, and underscores.",
+    };
+  }
+  return { valid: true, message: "" };
+}
+
+/**
+ * Validate a password for the user-management form.
+ * Required, minimum 8 characters.
+ * @param {string} value
+ * @returns {{ valid: boolean, message: string }}
+ */
+function validatePassword(value) {
+  if (!value) {
+    return { valid: false, message: "Password is required." };
+  }
+  if (value.length < 8) {
+    return { valid: false, message: "Password must be at least 8 characters." };
+  }
+  return { valid: true, message: "" };
+}
+
+/**
+ * Validate that the confirm-password field matches the password field.
+ * @param {string} password
+ * @param {string} confirmPassword
+ * @returns {{ valid: boolean, message: string }}
+ */
+function validateConfirmPassword(password, confirmPassword) {
+  if (!confirmPassword) {
+    return { valid: false, message: "Please confirm your password." };
+  }
+  if (password !== confirmPassword) {
+    return { valid: false, message: "Passwords do not match." };
+  }
+  return { valid: true, message: "" };
+}
