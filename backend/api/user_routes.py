@@ -1,14 +1,15 @@
 # backend/api/user_routes.py
-# User management routes: POST /api/users, PUT /api/users/{id}
+# User management routes: GET /api/users, POST /api/users, PUT /api/users/{id}
 # Access restricted to Administrators only.
 
 import logging
+from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from backend.auth import hash_password, require_role
 from backend.constants import ROLES
-from backend.database import execute, fetch_one
+from backend.database import execute, fetch_all, fetch_one
 from backend.models.user_models import UserCreate, UserOut, UserUpdate
 
 logger = logging.getLogger(__name__)
@@ -26,6 +27,23 @@ def _row_to_user_out(row) -> UserOut:
         role=row["role"],
         is_active=bool(row["is_active"]),
     )
+
+
+@router.get("", status_code=status.HTTP_200_OK)
+async def list_users(
+    _current_user: dict = Depends(_admin_only),
+) -> List[UserOut]:
+    """Return all user accounts. Only Administrators may call this endpoint.
+    Returns an empty list if no users exist."""
+    try:
+        rows = fetch_all("SELECT id, username, role, is_active FROM users", ())
+        return [_row_to_user_out(row) for row in rows]
+    except Exception:
+        logger.exception("Error listing users.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while retrieving users.",
+        )
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
