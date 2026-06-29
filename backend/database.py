@@ -74,10 +74,41 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS record_csv_data (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                record_id     INTEGER NOT NULL UNIQUE,
+                headers       TEXT NOT NULL,
+                rows          TEXT NOT NULL,
+                uploaded_by   TEXT NOT NULL,
+                uploaded_date TEXT NOT NULL,
+                updated_by    TEXT,
+                updated_date  TEXT,
+                FOREIGN KEY (record_id) REFERENCES maintenance_records(id)
+            )
+            """
+        )
         conn.commit()
         logger.info("Database tables initialized successfully.")
     finally:
         conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Schema migration helper
+# ---------------------------------------------------------------------------
+
+def add_column_if_not_exists(table: str, column: str, definition: str) -> None:
+    """Add a column to an existing table only if it does not already exist.
+
+    Uses PRAGMA table_info to inspect the current schema — safe to call
+    on every startup without duplicating columns.
+    """
+    existing = fetch_all(f"PRAGMA table_info({table})", ())
+    column_names = [row["name"] for row in existing]
+    if column not in column_names:
+        execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}", ())
 
 
 # ---------------------------------------------------------------------------
