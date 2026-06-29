@@ -33,7 +33,7 @@ function initLoginPage() {
     togglePwdBtn.addEventListener("click", () => {
       const isText = passwordInput.type === "text";
       passwordInput.type = isText ? "password" : "text";
-      togglePwdBtn.textContent = isText ? "👁" : "🙈";
+      togglePwdBtn.textContent = isText ? "Show" : "Hide";
     });
   }
 
@@ -71,11 +71,34 @@ function initLoginPage() {
 }
 
 // ---------------------------------------------------------------------------
+// SHARED HELPERS
+// ---------------------------------------------------------------------------
+
+/**
+ * Show or hide the "Manage Users" navbar link based on the current role.
+ * Reads #nav-manage-users and toggles d-none. Does not use innerHTML.
+ */
+function applyNavbarRoleVisibility() {
+  const role = getRole();
+  const manageUsersLink = document.getElementById("nav-manage-users");
+  if (manageUsersLink) {
+    if (role === ROLES.ADMIN) {
+      manageUsersLink.classList.remove("d-none");
+    } else {
+      manageUsersLink.classList.add("d-none");
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // DASHBOARD PAGE
 // ---------------------------------------------------------------------------
 
 let pendingDeleteId   = null;
 let pendingDeleteRow  = null;
+
+// Map of record id -> full record object, used by the row-click detail handler
+let _recordsMap = {};
 
 /**
  * Initialize the dashboard page.
@@ -86,6 +109,7 @@ function initDashboardPage() {
 
   guardPage();
   populateNavbar();
+  applyNavbarRoleVisibility();
 
   const role     = getRole();
   const username = getUsername();
@@ -107,7 +131,15 @@ function initDashboardPage() {
     };
     try {
       const records = await getRecords(filters);
+
+      // Keep a local map for the row-click handler
+      _recordsMap = {};
+      records.forEach((r) => { _recordsMap[r.id] = r; });
+
       renderRecordsTable(records, role, username);
+
+      // Attach row-click listeners after the table is rendered
+      attachRowClickListeners(role, username);
     } catch (err) {
       showToast(err.message || "Failed to load records.", "error");
     }
@@ -170,6 +202,33 @@ function initDashboardPage() {
 }
 
 /**
+ * Attach click listeners to every tbody row.
+ * Clicks on action buttons stop propagation so they don't open the modal.
+ */
+function attachRowClickListeners(role, username) {
+  const tbody = document.getElementById("records-tbody");
+  if (!tbody) return;
+
+  tbody.querySelectorAll("tr").forEach((tr) => {
+    const recordId = parseInt(tr.dataset.recordId, 10);
+
+    // Stop propagation on action buttons so row click doesn't trigger
+    tr.querySelectorAll(".btn-action, .attachment-link").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+      });
+    });
+
+    tr.addEventListener("click", () => {
+      const record = _recordsMap[recordId];
+      if (record) {
+        showRecordDetail(record, role, username);
+      }
+    });
+  });
+}
+
+/**
  * Handle download attachment button clicks from the table.
  * @param {Event} e
  * @param {number} recordId
@@ -214,6 +273,7 @@ async function initFormPage() {
 
   guardPage();
   populateNavbar();
+  applyNavbarRoleVisibility();
 
   const role = getRole();
 
@@ -358,6 +418,128 @@ async function initFormPage() {
 }
 
 // ---------------------------------------------------------------------------
+// MANAGE USERS PAGE
+// ---------------------------------------------------------------------------
+
+/**
+ * Render the existing users table on manage-users.html.
+ * @param {Array} users
+ */
+function renderUsersTable(users) {
+  const tbody = document.getElementById("users-tbody");
+  if (!tbody) return;
+
+  if (!users || users.length === 0) {
+    tbody.innerHTML = "";
+    const empty = document.getElementById("users-empty-state");
+    if (empty) empty.style.display = "block";
+    return;
+  }
+
+  const empty = document.getElementById("users-empty-state");
+  if (empty) empty.style.display = "none";
+
+  tbody.innerHTML = users.map((u) => {
+    const statusClass = u.is_active ? "type-badge-conducted" : "type-badge-planned";
+    const statusText  = u.is_active ? "Active" : "Inactive";
+    return `
+      <tr>
+        <td><span class="record-id-badge">#${u.id}</span></td>
+        <td>${escapeHtml(u.username)}</td>
+        <td>${escapeHtml(u.role)}</td>
+        <td><span class="type-badge ${statusClass}">${statusText}</span></td>
+      </tr>
+    `;
+  }).join("");
+}
+
+/**
+ * Initialize the manage-users page.
+ * Detects page by checking for #create-user-form.
+ */
+async function initManageUsersPage() {
+  const form = document.getElementById("create-user-form");
+  if (!form) return;
+
+  guardPage();
+
+  // Client-side role guard — server still enforces on the API
+  if (getRole() !== ROLES.ADMIN) {
+    window.location.replace("dashboard.html");
+    return;
+  }
+
+  populateNavbar();
+  applyNavbarRoleVisibility();
+
+  // Logout
+  const logoutBtn = document.getElementById("btn-logout");
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", () => logout());
+  }
+
+  const submitBtn = document.getElementById("btn-create-user");
+
+  // Load existing users table
+  async function loadUsers() {
+    try {
+      const users = await getUsers();
+      renderUsersTable(users);
+    } catch (err) {
+      showToast(err.message || "Failed to load users.", "error");
+    }
+  }
+
+  loadUsers();
+
+  // Form submit
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    clearFieldErrors();
+
+    const usernameVal  = document.getElementById("new-username")?.value ?? "";
+    const passwordVal  = document.getElementById("new-password")?.value ?? "";
+    const confirmVal   = document.getElementById("new-confirm-password")?.value ?? "";
+    const roleVal      = document.getElementById("new-role")?.value ?? "";
+
+    // Run all validators simultaneously
+    const validations = [
+      { fieldId: "new-username",          result: validateUsername(usernameVal) },
+      { fieldId: "new-password",          result: validatePassword(passwordVal) },
+      { fieldId: "new-confirm-password",  result: validateConfirmPassword(passwordVal, confirmVal) },
+      { fieldId: "new-role",              result: validateRequired(roleVal, "Role") },
+    ];
+
+    let hasErrors = false;
+    validations.forEach(({ fieldId, result }) => {
+      if (!result.valid) {
+        showFieldError(fieldId, result.message);
+        hasErrors = true;
+      }
+    });
+
+    if (hasErrors) return;
+
+    setLoading(submitBtn, true);
+    try {
+      await createUser({
+        username: usernameVal.trim(),
+        password: passwordVal,
+        role:     roleVal,
+      });
+      showToast(`User "${usernameVal.trim()}" created successfully.`, "success");
+      form.reset();
+      clearFieldErrors();
+      loadUsers();
+    } catch (err) {
+      showToast(err.message || "Failed to create user.", "error");
+    } finally {
+      setLoading(submitBtn, false);
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Bootstrap — auto-detect and initialize the correct page
 // ---------------------------------------------------------------------------
 
@@ -365,4 +547,5 @@ document.addEventListener("DOMContentLoaded", () => {
   initLoginPage();
   initDashboardPage();
   initFormPage();
+  initManageUsersPage();
 });
