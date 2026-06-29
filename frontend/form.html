@@ -16,7 +16,7 @@
 <nav class="app-navbar" role="navigation" aria-label="Main navigation">
   <div class="navbar-brand-area">
     <a href="dashboard.html" class="btn-back-nav" aria-label="Back to dashboard">
-      ← Back
+      &larr; Back
     </a>
     <div class="navbar-red-line" aria-hidden="true"></div>
     <div>
@@ -24,6 +24,14 @@
       <div class="app-subtitle">E-LogBook</div>
     </div>
   </div>
+
+  <!-- Manage Users link — visible to Administrators only (toggled by app.js) -->
+  <a
+    id="nav-manage-users"
+    href="manage-users.html"
+    class="nav-text-link d-none"
+    aria-label="Manage Users"
+  >Manage Users</a>
 
   <div class="navbar-user-info">
     <div class="user-badge" aria-label="Logged in user">
@@ -34,7 +42,7 @@
       </div>
     </div>
     <button id="btn-logout" class="btn btn-logout" type="button" aria-label="Logout">
-      ⏻ Logout
+      Logout
     </button>
   </div>
 </nav>
@@ -47,7 +55,7 @@
   <!-- Page header -->
   <div class="form-page-header">
     <h1 class="form-page-title" id="form-page-title">New Maintenance Record</h1>
-    <p class="form-page-subtitle">Complete all required fields marked with <span style="color:var(--ykg-red)">*</span></p>
+    <p class="form-page-subtitle">Complete all required fields marked with <span style="color:var(--color-danger)">*</span></p>
   </div>
 
   <form id="record-form" novalidate autocomplete="off" enctype="multipart/form-data">

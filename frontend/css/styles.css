@@ -1185,3 +1185,70 @@ code, .mono {
     display: none;
   }
 }
+
+/* ============================================================
+   17. ROW CLICK CURSOR (Record Detail)
+   ============================================================ */
+#records-tbody tr {
+  cursor: pointer;
+}
+
+/* ============================================================
+   18. NAVBAR TEXT LINK (Manage Users)
+   ============================================================ */
+.nav-text-link {
+  color: rgba(255, 255, 255, 0.90);
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.nav-text-link:hover {
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.nav-text-link.active {
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* ============================================================
+   19. RECORD DETAIL MODAL — definition list
+   ============================================================ */
+.detail-dl {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 0.55rem 1rem;
+  margin: 0;
+}
+
+.detail-dt {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  align-self: start;
+  padding-top: 2px;
+}
+
+.detail-dd {
+  font-size: 0.9rem;
+  color: var(--color-text-primary);
+  margin: 0;
+  word-break: break-word;
+}
+
+@media (max-width: 560px) {
+  .detail-dl {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+  }
+  .detail-dt {
+    margin-top: 0.65rem;
+  }
+}

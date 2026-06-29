@@ -22,6 +22,14 @@
     </div>
   </div>
 
+  <!-- Manage Users link — visible to Administrators only (toggled by app.js) -->
+  <a
+    id="nav-manage-users"
+    href="manage-users.html"
+    class="nav-text-link d-none"
+    aria-label="Manage Users"
+  >Manage Users</a>
+
   <div class="navbar-user-info">
     <div class="user-badge" aria-label="Logged in user">
       <div class="user-avatar" id="navbar-avatar-initials" aria-hidden="true">U</div>
@@ -31,7 +39,7 @@
       </div>
     </div>
     <button id="btn-logout" class="btn btn-logout" type="button" aria-label="Logout">
-      ⏻ Logout
+      Logout
     </button>
   </div>
 </nav>
@@ -75,7 +83,7 @@
   <div class="toolbar" role="search">
     <!-- Search -->
     <div class="toolbar-search">
-      <span class="toolbar-search-icon" aria-hidden="true">🔍</span>
+      <span class="toolbar-search-icon" aria-hidden="true">&#128269;</span>
       <input
         type="search"
         id="search-input"
@@ -109,7 +117,7 @@
 
   <!-- Records table -->
   <div class="records-table-wrapper">
-    <table class="records-table" role="grid" aria-label="Maintenance records">
+    <table id="recordsTable" class="records-table" role="grid" aria-label="Maintenance records">
       <thead>
         <tr>
           <th scope="col">#</th>
@@ -129,7 +137,7 @@
 
     <!-- Empty state -->
     <div id="empty-state" class="empty-state" style="display: none;" role="status" aria-live="polite">
-      <div class="empty-state-icon" aria-hidden="true">📋</div>
+      <div class="empty-state-icon" aria-hidden="true"></div>
       <p class="empty-state-text">No maintenance records found.</p>
       <p class="empty-state-subtext">Create a new record using the "New Record" button above.</p>
     </div>
@@ -163,8 +171,82 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-surface" data-bs-dismiss="modal">Cancel</button>
         <button type="button" id="btn-confirm-delete" class="btn btn-danger-soft">
-          🗑 Delete Record
+          Delete Record
         </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- =====================================================================
+     RECORD DETAIL MODAL
+     ===================================================================== -->
+<div
+  class="modal fade"
+  id="recordDetailModal"
+  tabindex="-1"
+  aria-labelledby="recordDetailModalTitle"
+  aria-hidden="true"
+  role="dialog"
+>
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title" id="recordDetailModalTitle" style="font-size: 1rem; font-weight: 700;">
+          Record Details
+        </h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <dl class="detail-dl">
+          <dt class="detail-dt">Record ID</dt>
+          <dd class="detail-dd" id="detail-id">—</dd>
+
+          <dt class="detail-dt">Maintenance Type</dt>
+          <dd class="detail-dd" id="detail-maintenance-type">—</dd>
+
+          <dt class="detail-dt">Equipment ID</dt>
+          <dd class="detail-dd" id="detail-equipment-id">—</dd>
+
+          <dt class="detail-dt">Date / Time</dt>
+          <dd class="detail-dd" id="detail-date-time">—</dd>
+
+          <dt class="detail-dt">Responsible Person</dt>
+          <dd class="detail-dd" id="detail-responsible-person">—</dd>
+
+          <dt class="detail-dt">Operating Conditions</dt>
+          <dd class="detail-dd" id="detail-operating-conditions">—</dd>
+
+          <dt class="detail-dt">Inventory / Consumables</dt>
+          <dd class="detail-dd" id="detail-inventory-consumables">—</dd>
+
+          <dt class="detail-dt">Remarks</dt>
+          <dd class="detail-dd" id="detail-remarks">—</dd>
+
+          <dt class="detail-dt">Attachment</dt>
+          <dd class="detail-dd" id="detail-attachment">—</dd>
+
+          <dt class="detail-dt">Created By</dt>
+          <dd class="detail-dd" id="detail-created-by">—</dd>
+
+          <dt class="detail-dt">Created Date</dt>
+          <dd class="detail-dd" id="detail-created-date">—</dd>
+
+          <dt class="detail-dt">Updated By</dt>
+          <dd class="detail-dd" id="detail-updated-by">—</dd>
+
+          <dt class="detail-dt">Updated Date</dt>
+          <dd class="detail-dd" id="detail-updated-date">—</dd>
+        </dl>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-surface" data-bs-dismiss="modal">Close</button>
+        <a
+          id="detail-btn-edit"
+          href="#"
+          class="btn btn-primary-ykg d-none"
+          role="button"
+        >Edit Record</a>
       </div>
     </div>
   </div>
