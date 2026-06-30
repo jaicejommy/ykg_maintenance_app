@@ -35,7 +35,7 @@ class RecordCreate(BaseModel):
     """Fields required when creating a new maintenance record via form data.
 
     Note: This model is used for validation of individual string fields received
-    from multipart/form-data. The file attachment is handled separately.
+    from multipart/form-data. File attachments are handled separately.
 
     created_time and last_updated_time are deliberately excluded — they are
     system-assigned in the route handler and must never be accepted from client input.
@@ -187,6 +187,17 @@ class RecordUpdate(BaseModel):
         return self
 
 
+class AttachmentOut(BaseModel):
+    """Single attachment row returned to the client."""
+
+    id: int
+    record_id: int
+    original_filename: str
+    file_size_bytes: Optional[int] = None
+    uploaded_by: str
+    uploaded_date: str
+
+
 class RecordOut(BaseModel):
     """Full maintenance record representation returned to the client."""
 
@@ -207,3 +218,7 @@ class RecordOut(BaseModel):
     created_date: str
     updated_by: Optional[str] = None
     updated_date: Optional[str] = None
+    # Lightweight count of record_attachments rows — avoids sending full file
+    # metadata on every list call. Populated via COUNT() subquery in list route;
+    # populated via _get_attachment_count() on single-record responses.
+    attachment_count: int = 0

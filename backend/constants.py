@@ -32,6 +32,9 @@ ALLOWED_MIME_TYPES = {
     "image/png",
 }
 
+# Maximum number of attachments allowed per maintenance record (create + edit combined).
+MAX_ATTACHMENTS_PER_RECORD = 10
+
 # ---------------------------------------------------------------------------
 # Field length limits
 # ---------------------------------------------------------------------------
