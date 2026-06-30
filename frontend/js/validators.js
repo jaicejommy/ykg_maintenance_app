@@ -36,17 +36,34 @@ function validateMaxLength(value, max, fieldName) {
 }
 
 /**
- * Validate that a datetime-local value is a non-empty, parsable date string.
+ * Validate that an optional datetime-local value, if present, is a parsable date string.
+ * Returns valid: true when the value is empty (field is optional).
  * @param {string} value
+ * @param {string} fieldName
  * @returns {{ valid: boolean, message: string }}
  */
-function validateDatetime(value) {
-  if (!value || !value.trim()) {
-    return { valid: false, message: "Date / Time is required." };
-  }
+function validateDatetimeOptional(value, fieldName) {
+  if (!value) return { valid: true, message: "" };
   const parsed = new Date(value);
   if (isNaN(parsed.getTime())) {
-    return { valid: false, message: "Date / Time is not a valid date." };
+    return { valid: false, message: `${fieldName} must be a valid date and time.` };
+  }
+  return { valid: true, message: "" };
+}
+
+/**
+ * Validate that planned_end is not earlier than planned_start.
+ * Returns valid: true when either field is empty (ordering only applies when both are set).
+ * @param {string} plannedStart
+ * @param {string} plannedEnd
+ * @returns {{ valid: boolean, message: string }}
+ */
+function validatePlannedWindow(plannedStart, plannedEnd) {
+  if (!plannedStart || !plannedEnd) return { valid: true, message: "" };
+  const start = new Date(plannedStart);
+  const end = new Date(plannedEnd);
+  if (end < start) {
+    return { valid: false, message: "Planned End cannot be earlier than Planned Start." };
   }
   return { valid: true, message: "" };
 }

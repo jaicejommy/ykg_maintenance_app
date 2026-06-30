@@ -172,6 +172,7 @@ function populateNavbar() {
 /**
  * Build and inject table rows for maintenance records.
  * Conditionally renders Edit/Delete buttons based on user role and ownership.
+ * Uses appendCell() and formatDisplayDate() helpers throughout — no innerHTML with record data.
  * @param {Array<object>} records
  * @param {string} userRole
  * @param {string} username
@@ -191,7 +192,7 @@ function renderRecordsTable(records, userRole, username) {
   if (statConducted) statConducted.textContent = records.filter(r => r.maintenance_type === "Conducted").length;
 
   if (records.length === 0) {
-    tbody.innerHTML = "";
+    tbody.textContent = "";
     if (emptyState) emptyState.style.display = "block";
     return;
   }
@@ -200,57 +201,139 @@ function renderRecordsTable(records, userRole, username) {
   const isAdmin    = userRole === ROLES.ADMIN;
   const isEngineer = userRole === ROLES.ENGINEER;
 
-  tbody.innerHTML = records.map((record) => {
-    const typeBadgeClass = record.maintenance_type === "Planned"
+  // Clear existing rows safely (no innerHTML on tbody itself)
+  tbody.textContent = "";
+
+  records.forEach((record) => {
+    const row = document.createElement("tr");
+    row.dataset.recordId = record.id;
+
+    // # (record id badge)
+    const idTd = document.createElement("td");
+    const idBadge = document.createElement("span");
+    idBadge.className = "record-id-badge";
+    idBadge.textContent = "#" + record.id;
+    idTd.appendChild(idBadge);
+    row.appendChild(idTd);
+
+    // Created Time — before Equipment ID per spec
+    appendCell(row, formatDisplayDate(record.created_time));
+
+    // Equipment ID
+    appendCell(row, record.equipment_id);
+
+    // Type — with badge styling
+    const typeTd = document.createElement("td");
+    const typeBadge = document.createElement("span");
+    typeBadge.className = "type-badge " + (record.maintenance_type === "Planned"
       ? "type-badge-planned"
-      : "type-badge-conducted";
+      : "type-badge-conducted");
+    typeBadge.textContent = record.maintenance_type;
+    typeTd.appendChild(typeBadge);
+    row.appendChild(typeTd);
 
-    const attachmentCell = record.attachment_original_name
-      ? `<a href="#" class="attachment-link"
-           onclick="handleDownload(event, ${record.id}, '${escapeHtml(record.attachment_original_name)}')"
-           title="Download attachment">
-           ${escapeHtml(record.attachment_original_name)}
-         </a>`
-      : `<span class="attachment-dash">—</span>`;
+    // Responsible Person
+    appendCell(row, record.responsible_person);
 
-    // Determine which action buttons to show
-    const canEdit = isAdmin || (isEngineer && record.created_by === username);
+    // Planned Start — after Responsible Person per spec
+    appendCell(row, formatDisplayDate(record.planned_start));
+
+    // Planned End — after Planned Start per spec
+    appendCell(row, formatDisplayDate(record.planned_end));
+
+    // Last Updated — after Planned End per spec
+    appendCell(row, formatDisplayDate(record.last_updated_time));
+
+    // Attachment cell — link or dash; uses setAttribute/textContent, never innerHTML
+    const attachTd = document.createElement("td");
+    if (record.attachment_original_name) {
+      const link = document.createElement("a");
+      link.setAttribute("href", "#");
+      link.className = "attachment-link";
+      link.textContent = record.attachment_original_name;
+      link.addEventListener("click", (e) => {
+        e.stopPropagation();
+        handleDownload(e, record.id, record.attachment_original_name);
+      });
+      attachTd.appendChild(link);
+    } else {
+      const dash = document.createElement("span");
+      dash.className = "attachment-dash";
+      dash.textContent = "\u2014";
+      attachTd.appendChild(dash);
+    }
+    row.appendChild(attachTd);
+
+    // Created By
+    const createdByTd = document.createElement("td");
+    createdByTd.className = "text-muted-custom";
+    createdByTd.textContent = record.created_by || "\u2014";
+    row.appendChild(createdByTd);
+
+    // Actions cell
+    const canEdit   = isAdmin || (isEngineer && record.created_by === username);
     const canDelete = isAdmin;
 
-    const editBtn = canEdit
-      ? `<a href="form.html?id=${record.id}" class="btn-action btn-action-edit">Edit</a>`
-      : "";
+    const actionsTd = document.createElement("td");
+    if (canEdit || canDelete) {
+      const actionsDiv = document.createElement("div");
+      actionsDiv.className = "actions-cell d-flex gap-1";
 
-    const deleteBtn = canDelete
-      ? `<button class="btn-action btn-action-delete"
-            onclick="handleDeleteClick(${record.id}, this)">Delete</button>`
-      : "";
+      if (canEdit) {
+        const editLink = document.createElement("a");
+        editLink.setAttribute("href", `form.html?id=${record.id}`);
+        editLink.className = "btn-action btn-action-edit";
+        editLink.textContent = "Edit";
+        actionsDiv.appendChild(editLink);
+      }
 
-    const actionsCell = (editBtn || deleteBtn)
-      ? `<div class="actions-cell d-flex gap-1">${editBtn}${deleteBtn}</div>`
-      : `<span class="text-muted-custom">—</span>`;
+      if (canDelete) {
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "btn-action btn-action-delete";
+        deleteBtn.textContent = "Delete";
+        deleteBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          handleDeleteClick(record.id, deleteBtn);
+        });
+        actionsDiv.appendChild(deleteBtn);
+      }
 
-    // Format datetime for display
-    const displayDate = record.date_time
-      ? new Date(record.date_time).toLocaleString("en-GB", {
-          day: "2-digit", month: "short", year: "numeric",
-          hour: "2-digit", minute: "2-digit",
-        })
-      : record.date_time;
+      actionsTd.appendChild(actionsDiv);
+    } else {
+      const dash = document.createElement("span");
+      dash.className = "text-muted-custom";
+      dash.textContent = "\u2014";
+      actionsTd.appendChild(dash);
+    }
+    row.appendChild(actionsTd);
 
-    return `
-      <tr data-record-id="${record.id}">
-        <td><span class="record-id-badge">#${record.id}</span></td>
-        <td>${escapeHtml(record.equipment_id)}</td>
-        <td><span class="type-badge ${typeBadgeClass}">${escapeHtml(record.maintenance_type)}</span></td>
-        <td>${escapeHtml(displayDate)}</td>
-        <td>${escapeHtml(record.responsible_person)}</td>
-        <td>${attachmentCell}</td>
-        <td class="text-muted-custom">${escapeHtml(record.created_by)}</td>
-        <td>${actionsCell}</td>
-      </tr>
-    `;
-  }).join("");
+    tbody.appendChild(row);
+  });
+}
+
+/**
+ * Append a plain-text table cell to a row.
+ * Using textContent only — never innerHTML — prevents XSS from record data.
+ * @param {HTMLTableRowElement} row
+ * @param {string|null|undefined} text
+ */
+function appendCell(row, text) {
+  const td = document.createElement("td");
+  td.textContent = text || "\u2014";
+  row.appendChild(td);
+}
+
+/**
+ * Format an ISO date string for table cell display.
+ * Returns '—' for null/undefined/empty/unparsable values.
+ * @param {string|null|undefined} isoString
+ * @returns {string}
+ */
+function formatDisplayDate(isoString) {
+  if (!isoString) return "\u2014";
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return "\u2014";
+  return date.toLocaleString();
 }
 
 // ---------------------------------------------------------------------------
@@ -274,17 +357,17 @@ function populateForm(record) {
   setValue("field-inventory-consumables", record.inventory_consumables);
   setValue("field-remarks", record.remarks);
 
-  // Datetime-local requires "YYYY-MM-DDTHH:mm" format
-  if (record.date_time) {
-    const dt = new Date(record.date_time);
-    if (!isNaN(dt.getTime())) {
-      const pad = (n) => String(n).padStart(2, "0");
-      const local = `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
-      setValue("field-date-time", local);
-    } else {
-      setValue("field-date-time", record.date_time);
-    }
-  }
+  // datetime-local inputs require "YYYY-MM-DDTHH:mm" format
+  const toDatetimeLocal = (isoString) => {
+    if (!isoString) return "";
+    const dt = new Date(isoString);
+    if (isNaN(dt.getTime())) return isoString;
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+  };
+
+  setValue("field-planned-start", toDatetimeLocal(record.planned_start));
+  setValue("field-planned-end",   toDatetimeLocal(record.planned_end));
 
   // Show existing attachment info
   if (record.attachment_original_name) {
@@ -330,21 +413,6 @@ function showRecordDetail(record, userRole, username) {
   set("detail-created-date",          record.created_date);
   set("detail-updated-by",            record.updated_by);
   set("detail-updated-date",          record.updated_date);
-
-  // Format datetime
-  if (record.date_time) {
-    const dt = new Date(record.date_time);
-    const formatted = isNaN(dt.getTime())
-      ? record.date_time
-      : dt.toLocaleString("en-GB", {
-          day: "2-digit", month: "short", year: "numeric",
-          hour: "2-digit", minute: "2-digit",
-        });
-    const dtEl = document.getElementById("detail-date-time");
-    if (dtEl) dtEl.textContent = formatted;
-  } else {
-    set("detail-date-time", null);
-  }
 
   // Attachment — use setAttribute, never innerHTML
   const attachEl = document.getElementById("detail-attachment");

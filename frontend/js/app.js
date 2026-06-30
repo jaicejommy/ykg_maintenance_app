@@ -403,23 +403,25 @@ async function initFormPage() {
     e.preventDefault();
     clearFieldErrors();
 
-    const maintenanceType     = document.getElementById("field-maintenance-type")?.value;
-    const equipmentId         = document.getElementById("field-equipment-id")?.value ?? "";
-    const dateTime            = document.getElementById("field-date-time")?.value ?? "";
-    const responsiblePerson   = document.getElementById("field-responsible-person")?.value ?? "";
-    const operatingConditions = document.getElementById("field-operating-conditions")?.value ?? "";
+    const maintenanceType      = document.getElementById("field-maintenance-type")?.value;
+    const equipmentId          = document.getElementById("field-equipment-id")?.value ?? "";
+    const responsiblePerson    = document.getElementById("field-responsible-person")?.value ?? "";
+    const plannedStart         = document.getElementById("field-planned-start")?.value ?? "";
+    const plannedEnd           = document.getElementById("field-planned-end")?.value ?? "";
+    const operatingConditions  = document.getElementById("field-operating-conditions")?.value ?? "";
     const inventoryConsumables = document.getElementById("field-inventory-consumables")?.value ?? "";
-    const remarks             = document.getElementById("field-remarks")?.value ?? "";
-    const file                = fileInput?.files[0] ?? null;
+    const remarks              = document.getElementById("field-remarks")?.value ?? "";
+    const file                 = fileInput?.files[0] ?? null;
 
-    // Run all validators and collect errors
+    // Run all per-field validators and collect errors
     const validations = [
       { fieldId: "field-maintenance-type",      result: validateMaintenanceType(maintenanceType) },
       { fieldId: "field-equipment-id",          result: validateRequired(equipmentId, "Equipment ID") },
       { fieldId: "field-equipment-id",          result: validateMaxLength(equipmentId, MAX_EQUIPMENT_ID_LENGTH, "Equipment ID") },
-      { fieldId: "field-date-time",             result: validateDatetime(dateTime) },
       { fieldId: "field-responsible-person",    result: validateRequired(responsiblePerson, "Responsible Person") },
       { fieldId: "field-responsible-person",    result: validateMaxLength(responsiblePerson, MAX_RESPONSIBLE_PERSON_LENGTH, "Responsible Person") },
+      { fieldId: "field-planned-start",         result: validateDatetimeOptional(plannedStart, "Planned Start") },
+      { fieldId: "field-planned-end",           result: validateDatetimeOptional(plannedEnd, "Planned End") },
       { fieldId: "field-operating-conditions",  result: validateMaxLength(operatingConditions, MAX_TEXT_FIELD_LENGTH, "Operating Conditions") },
       { fieldId: "field-inventory-consumables", result: validateMaxLength(inventoryConsumables, MAX_TEXT_FIELD_LENGTH, "Inventory / Consumables") },
       { fieldId: "field-remarks",               result: validateMaxLength(remarks, MAX_REMARKS_LENGTH, "Remarks") },
@@ -438,18 +440,26 @@ async function initFormPage() {
       }
     });
 
+    // Cross-field: planned_end must not precede planned_start
+    const windowResult = validatePlannedWindow(plannedStart, plannedEnd);
+    if (!windowResult.valid) {
+      showFieldError("field-planned-end", windowResult.message);
+      hasErrors = true;
+    }
+
     if (hasErrors) return;
 
-    // Build FormData
+    // Build FormData — field names match the name attributes on the HTML inputs
     const formData = new FormData();
-    formData.append("maintenance_type",      maintenanceType);
-    formData.append("equipment_id",          equipmentId.trim());
-    formData.append("date_time",             dateTime);
-    formData.append("responsible_person",    responsiblePerson.trim());
-    if (operatingConditions)  formData.append("operating_conditions",  operatingConditions);
-    if (inventoryConsumables) formData.append("inventory_consumables", inventoryConsumables);
-    if (remarks)              formData.append("remarks",               remarks);
-    if (file)                 formData.append("attachment",            file);
+    formData.append("maintenance_type",   maintenanceType);
+    formData.append("equipment_id",       equipmentId.trim());
+    formData.append("responsible_person", responsiblePerson.trim());
+    if (plannedStart)          formData.append("planned_start",          plannedStart);
+    if (plannedEnd)            formData.append("planned_end",            plannedEnd);
+    if (operatingConditions)   formData.append("operating_conditions",   operatingConditions);
+    if (inventoryConsumables)  formData.append("inventory_consumables",  inventoryConsumables);
+    if (remarks)               formData.append("remarks",                remarks);
+    if (file)                  formData.append("attachment",             file);
 
     setLoading(submitBtn, true);
     try {
@@ -808,6 +818,31 @@ async function initRecordDetailPage() {
 }
 
 /**
+ * Format an ISO date string for human-readable display.
+ * Returns '—' for null/undefined/empty or unparsable values.
+ * Reused by both the detail page and the records table in ui.js.
+ * @param {string|null|undefined} isoString
+ * @returns {string}
+ */
+function formatDisplayDate(isoString) {
+  if (!isoString) return "\u2014";
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return "\u2014";
+  return date.toLocaleString();
+}
+
+/**
+ * Set a detail-page field's textContent by element ID.
+ * Reused for all definition-grid fields to consolidate repeated getElementById patterns.
+ * @param {string} elementId
+ * @param {string} value
+ */
+function setDetailField(elementId, value) {
+  const el = document.getElementById(elementId);
+  if (el) el.textContent = value || "\u2014";
+}
+
+/**
  * Populate Section 1 record fields using textContent / setAttribute only.
  * @param {object} record
  */
@@ -830,20 +865,11 @@ function _populateDetailFields(record) {
   set("detail-updated-by",            record.updated_by);
   set("detail-updated-date",          record.updated_date);
 
-  // Format datetime
-  if (record.date_time) {
-    const dt = new Date(record.date_time);
-    const formatted = isNaN(dt.getTime())
-      ? record.date_time
-      : dt.toLocaleString("en-GB", {
-          day: "2-digit", month: "short", year: "numeric",
-          hour: "2-digit", minute: "2-digit",
-        });
-    const dtEl = document.getElementById("detail-date-time");
-    if (dtEl) dtEl.textContent = formatted;
-  } else {
-    set("detail-date-time", null);
-  }
+  // Four new time fields — all formatted consistently via formatDisplayDate()
+  setDetailField("detail-created-time",      formatDisplayDate(record.created_time));
+  setDetailField("detail-planned-start",     formatDisplayDate(record.planned_start));
+  setDetailField("detail-planned-end",       formatDisplayDate(record.planned_end));
+  setDetailField("detail-last-updated-time", formatDisplayDate(record.last_updated_time));
 
   // Attachment — use setAttribute, never innerHTML
   const attachEl = document.getElementById("detail-attachment");
