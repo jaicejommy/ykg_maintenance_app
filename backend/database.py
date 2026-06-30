@@ -57,11 +57,14 @@ def init_db() -> None:
                 id                       INTEGER PRIMARY KEY AUTOINCREMENT,
                 maintenance_type         TEXT    NOT NULL
                                              CHECK(maintenance_type IN ('Planned', 'Conducted')),
+                created_time             TEXT    NOT NULL,
+                equipment_id             TEXT    NOT NULL,
                 operating_conditions     TEXT,
                 inventory_consumables    TEXT,
-                equipment_id             TEXT    NOT NULL,
-                date_time                TEXT    NOT NULL,
                 responsible_person       TEXT    NOT NULL,
+                planned_start            TEXT,
+                planned_end              TEXT,
+                last_updated_time        TEXT,
                 remarks                  TEXT,
                 attachment_path          TEXT,
                 attachment_original_name TEXT,
@@ -93,6 +96,15 @@ def init_db() -> None:
         logger.info("Database tables initialized successfully.")
     finally:
         conn.close()
+
+    # Migrate existing databases — add new columns if absent.
+    # The old date_time column is intentionally left on existing installations
+    # (SQLite DROP COLUMN is not reliably supported in older versions).
+    # No code anywhere reads from or writes to date_time going forward.
+    add_column_if_not_exists("maintenance_records", "created_time", "TEXT")
+    add_column_if_not_exists("maintenance_records", "planned_start", "TEXT")
+    add_column_if_not_exists("maintenance_records", "planned_end", "TEXT")
+    add_column_if_not_exists("maintenance_records", "last_updated_time", "TEXT")
 
 
 # ---------------------------------------------------------------------------

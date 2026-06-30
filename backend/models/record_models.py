@@ -1,9 +1,10 @@
 # backend/models/record_models.py
 # Pydantic schemas for maintenance record API payloads and responses.
 
+from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 from backend.constants import (
     MAINTENANCE_TYPES,
@@ -14,17 +15,37 @@ from backend.constants import (
 )
 
 
+def _validate_planned_window(planned_start: Optional[str], planned_end: Optional[str]) -> None:
+    """Shared helper: raise ValueError if planned_end precedes planned_start.
+
+    Both RecordCreate and RecordUpdate validators call this. Keep the logic
+    here and in sync — do not duplicate the date-comparison logic inline.
+    """
+    if planned_start and planned_end:
+        try:
+            start = datetime.fromisoformat(planned_start)
+            end = datetime.fromisoformat(planned_end)
+        except ValueError:
+            raise ValueError("planned_start and planned_end must be valid ISO datetime strings.")
+        if end < start:
+            raise ValueError("planned_end cannot be earlier than planned_start.")
+
+
 class RecordCreate(BaseModel):
     """Fields required when creating a new maintenance record via form data.
 
     Note: This model is used for validation of individual string fields received
     from multipart/form-data. The file attachment is handled separately.
+
+    created_time and last_updated_time are deliberately excluded — they are
+    system-assigned in the route handler and must never be accepted from client input.
     """
 
     maintenance_type: str
     equipment_id: str
-    date_time: str
     responsible_person: str
+    planned_start: Optional[str] = None
+    planned_end: Optional[str] = None
     operating_conditions: Optional[str] = None
     inventory_consumables: Optional[str] = None
     remarks: Optional[str] = None
@@ -49,13 +70,6 @@ class RecordCreate(BaseModel):
                 f"equipment_id must be at most {MAX_EQUIPMENT_ID_LENGTH} characters."
             )
         return stripped
-
-    @field_validator("date_time")
-    @classmethod
-    def date_time_not_empty(cls, value: str) -> str:
-        if not value.strip():
-            raise ValueError("date_time must not be blank.")
-        return value.strip()
 
     @field_validator("responsible_person")
     @classmethod
@@ -96,14 +110,26 @@ class RecordCreate(BaseModel):
             )
         return value
 
+    @model_validator(mode="after")
+    def validate_planned_window(self):
+        # NOTE: Must stay in sync with the identical validator on RecordUpdate.
+        _validate_planned_window(self.planned_start, self.planned_end)
+        return self
+
 
 class RecordUpdate(BaseModel):
-    """Fields that may be updated on an existing maintenance record."""
+    """Fields that may be updated on an existing maintenance record.
+
+    last_updated_time is deliberately excluded — it is always system-assigned
+    inside the route handler and must never be accepted from client input.
+    created_time is also excluded — it is immutable once set at creation.
+    """
 
     maintenance_type: Optional[str] = None
     equipment_id: Optional[str] = None
-    date_time: Optional[str] = None
     responsible_person: Optional[str] = None
+    planned_start: Optional[str] = None
+    planned_end: Optional[str] = None
     operating_conditions: Optional[str] = None
     inventory_consumables: Optional[str] = None
     remarks: Optional[str] = None
@@ -154,21 +180,30 @@ class RecordUpdate(BaseModel):
             )
         return value
 
+    @model_validator(mode="after")
+    def validate_planned_window(self):
+        # NOTE: Must stay in sync with the identical validator on RecordCreate.
+        _validate_planned_window(self.planned_start, self.planned_end)
+        return self
+
 
 class RecordOut(BaseModel):
     """Full maintenance record representation returned to the client."""
 
     id: int
     maintenance_type: str
-    operating_conditions: Optional[str]
-    inventory_consumables: Optional[str]
+    created_time: str
     equipment_id: str
-    date_time: str
+    operating_conditions: Optional[str] = None
+    inventory_consumables: Optional[str] = None
     responsible_person: str
-    remarks: Optional[str]
-    attachment_path: Optional[str]
-    attachment_original_name: Optional[str]
+    planned_start: Optional[str] = None
+    planned_end: Optional[str] = None
+    last_updated_time: Optional[str] = None
+    remarks: Optional[str] = None
+    attachment_path: Optional[str] = None
+    attachment_original_name: Optional[str] = None
     created_by: str
     created_date: str
-    updated_by: Optional[str]
-    updated_date: Optional[str]
+    updated_by: Optional[str] = None
+    updated_date: Optional[str] = None
