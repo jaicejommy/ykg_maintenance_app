@@ -85,15 +85,28 @@ async def create_user(
 async def update_user(
     user_id: int,
     payload: UserUpdate,
-    _current_user: dict = Depends(_admin_only),
+    current_user: dict = Depends(_admin_only),
 ) -> UserOut:
-    """Update a user's role, active status, or password. Administrators only."""
+    """Update a user's role, active status, or password. Administrators only.
+
+    Critical safeguard: an Administrator may not deactivate their own account.
+    This prevents an Administrator from accidentally locking themselves out.
+    The check is enforced server-side; the client-side UI hiding is not relied upon.
+    """
     try:
         row = fetch_one("SELECT * FROM users WHERE id = ?", (user_id,))
         if not row:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"User with id {user_id} not found.",
+            )
+
+        # Prevent an Administrator from deactivating their own account.
+        current_username = current_user["sub"]
+        if payload.is_active is False and row["username"] == current_username:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You cannot deactivate your own account.",
             )
 
         # Build the update dynamically from only the provided fields

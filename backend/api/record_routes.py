@@ -1,5 +1,5 @@
 # backend/api/record_routes.py
-# Maintenance record CRUD routes and attachment download.
+# Maintenance record CRUD routes and attachment management.
 
 import logging
 import os
@@ -9,16 +9,18 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
+from pydantic import ValidationError
 
 from backend.auth import get_current_user, require_role
 from backend.constants import (
     ALLOWED_EXTENSIONS,
     ALLOWED_MIME_TYPES,
     ATTACHMENTS_DIR,
+    MAX_ATTACHMENTS_PER_RECORD,
     ROLES,
 )
 from backend.database import execute, fetch_all, fetch_one
-from backend.models.record_models import RecordCreate, RecordOut, RecordUpdate
+from backend.models.record_models import AttachmentOut, RecordCreate, RecordOut, RecordUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -47,50 +49,73 @@ def _now_utc_str() -> str:
 
 
 def _validate_attachment(file: UploadFile) -> None:
-    """Validate attachment extension and MIME type. Raises HTTPException on failure."""
+    """Validate attachment extension and MIME type. Raises HTTP 400 on failure.
+
+    Called once per file in a batch before any file is written to disk.
+    All files in the batch must pass before any are persisted.
+    """
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                f"File type '{ext}' is not allowed. "
+                f"File '{file.filename}': type '{ext}' is not allowed. "
                 f"Accepted: {', '.join(sorted(ALLOWED_EXTENSIONS))}."
             ),
         )
     if file.content_type not in ALLOWED_MIME_TYPES:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                f"MIME type '{file.content_type}' is not allowed. "
+                f"File '{file.filename}': MIME type '{file.content_type}' is not allowed. "
                 "Upload a PDF, Excel spreadsheet, JPG, or PNG."
             ),
         )
 
 
-def _save_attachment(file: UploadFile) -> tuple[str, str]:
-    """Read, size-check, and persist an uploaded file. Returns (saved_path, original_name)."""
+def _read_and_check_size(file: UploadFile) -> bytes:
+    """Read file contents and validate size. Raises HTTP 400 if too large.
+
+    Must be called after _validate_attachment(), before _persist_file().
+    Reading is separated from persisting so that all files in a batch can be
+    validated in memory before any are written to disk — no partial saves.
+    """
     max_bytes = _get_max_upload_bytes()
     contents = file.file.read()
-
     if len(contents) > max_bytes:
         max_mb = max_bytes / (1024 * 1024)
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"File exceeds the maximum allowed size of {max_mb:.0f} MB.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File '{file.filename}' exceeds the maximum allowed size of {max_mb:.0f} MB.",
         )
+    return contents
 
-    ext = os.path.splitext(file.filename or "")[1].lower()
+
+def _persist_file(contents: bytes, original_filename: str) -> tuple[str, str, int]:
+    """Write pre-validated bytes to disk with a UUID filename.
+
+    Returns (save_path, original_filename, file_size_bytes).
+    Only called after all files in a batch have passed validation.
+    """
+    ext = os.path.splitext(original_filename or "")[1].lower()
     unique_name = f"{uuid.uuid4().hex}{ext}"
     save_path = os.path.join(ATTACHMENTS_DIR, unique_name)
-
     os.makedirs(ATTACHMENTS_DIR, exist_ok=True)
     with open(save_path, "wb") as f:
         f.write(contents)
+    return save_path, original_filename or unique_name, len(contents)
 
-    return save_path, file.filename or unique_name
+
+def _get_attachment_count(record_id: int) -> int:
+    """Return the number of record_attachments rows for a given record."""
+    row = fetch_one(
+        "SELECT COUNT(*) AS cnt FROM record_attachments WHERE record_id = ?",
+        (record_id,),
+    )
+    return row["cnt"] if row else 0
 
 
-def _row_to_record_out(row) -> RecordOut:
+def _row_to_record_out(row, attachment_count: int = 0) -> RecordOut:
     """Convert a sqlite3.Row to a RecordOut schema instance."""
     return RecordOut(
         id=row["id"],
@@ -110,6 +135,7 @@ def _row_to_record_out(row) -> RecordOut:
         created_date=row["created_date"],
         updated_by=row["updated_by"],
         updated_date=row["updated_date"],
+        attachment_count=attachment_count,
     )
 
 
@@ -124,6 +150,9 @@ async def list_records(
     current_user: dict = Depends(get_current_user),
 ) -> list[RecordOut]:
     """Return all active (non-deleted) maintenance records.
+
+    Each record includes a lightweight attachment_count (COUNT subquery) so the
+    dashboard can display "N files" without fetching full attachment metadata.
 
     Supports optional query parameters:
     - ``type``: filter by maintenance_type ('Planned' or 'Conducted')
@@ -145,10 +174,15 @@ async def list_records(
             params.extend([keyword, keyword, keyword])
 
         where_clause = " AND ".join(conditions)
-        # ORDER BY created_time DESC for chronological ordering of the domain field.
-        query = f"SELECT * FROM maintenance_records WHERE {where_clause} ORDER BY id DESC"  # noqa: S608
+        # Subquery COUNT keeps the dashboard payload light — no full attachment list here.
+        query = (  # noqa: S608
+            "SELECT maintenance_records.*, "
+            "COALESCE((SELECT COUNT(*) FROM record_attachments "
+            "           WHERE record_id = maintenance_records.id), 0) AS attachment_count "
+            f"FROM maintenance_records WHERE {where_clause} ORDER BY id DESC"
+        )
         rows = fetch_all(query, tuple(params))
-        return [_row_to_record_out(r) for r in rows]
+        return [_row_to_record_out(r, attachment_count=r["attachment_count"]) for r in rows]
 
     except HTTPException:
         raise
@@ -174,7 +208,7 @@ async def create_record(
     operating_conditions: Optional[str] = Form(None),
     inventory_consumables: Optional[str] = Form(None),
     remarks: Optional[str] = Form(None),
-    attachment: Optional[UploadFile] = File(None),
+    attachments: list[UploadFile] = File(default=[]),
     current_user: dict = Depends(_engineer_or_admin),
 ) -> RecordOut:
     """Create a new maintenance record. Accepts multipart/form-data.
@@ -183,6 +217,9 @@ async def create_record(
     It is the maintenance-domain creation timestamp, conceptually distinct from
     created_date (the audit-trail row-insertion timestamp). Both are set to the
     same UTC moment at creation — they serve different conceptual roles.
+
+    Bug 1 fix: pydantic.ValidationError is caught explicitly and returned as 422
+    so field-level errors surface to the client rather than being swallowed as 500.
     """
     try:
         # Validate text fields through Pydantic model.
@@ -198,33 +235,54 @@ async def create_record(
             remarks=remarks,
         )
 
-        attachment_path = None
-        attachment_original_name = None
+        # Filter out empty UploadFile entries (browser sends empty entry when no files chosen)
+        valid_attachments = [a for a in attachments if a.filename]
 
-        if attachment and attachment.filename:
-            _validate_attachment(attachment)
-            attachment_path, attachment_original_name = _save_attachment(attachment)
+        if len(valid_attachments) > MAX_ATTACHMENTS_PER_RECORD:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"A record may have at most {MAX_ATTACHMENTS_PER_RECORD} attachments. "
+                    f"{len(valid_attachments)} files were submitted."
+                ),
+            )
 
-        # Both created_time (domain field) and created_date (audit field) are set
-        # to the same UTC moment. They serve different conceptual roles even when
-        # numerically equal: created_time tracks the maintenance activity's log start;
-        # created_date tracks the database row insertion.
+        # Phase 1: validate ALL files (extension + MIME + size) before writing any.
+        for att in valid_attachments:
+            _validate_attachment(att)
+
+        file_payloads: list[tuple[bytes, str]] = []
+        for att in valid_attachments:
+            contents = _read_and_check_size(att)
+            file_payloads.append((contents, att.filename or ""))
+
+        # Phase 2: all files passed — persist them.
+        saved_files: list[tuple[str, str, int]] = []
+        for contents, original_name in file_payloads:
+            save_path, original_name, size = _persist_file(contents, original_name)
+            saved_files.append((save_path, original_name, size))
+
+        # Both created_time (domain field) and created_date (audit field) are set to
+        # the same UTC moment. They serve different conceptual roles even when numerically
+        # equal: created_time tracks the maintenance activity's log start; created_date
+        # tracks the database row insertion.
         now_iso = _now_utc_str()
         username = current_user["sub"]
 
         new_id = execute(
             """
             INSERT INTO maintenance_records (
-                maintenance_type, created_time, equipment_id,
-                operating_conditions, inventory_consumables,
+                maintenance_type, created_time, date_time,
+                equipment_id, operating_conditions, inventory_consumables,
                 responsible_person, planned_start, planned_end,
                 remarks, attachment_path, attachment_original_name,
                 created_by, created_date
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 validated.maintenance_type,
                 now_iso,
+                now_iso,  # date_time — legacy NOT NULL column; kept for DB constraint only, never read
                 validated.equipment_id,
                 validated.operating_conditions,
                 validated.inventory_consumables,
@@ -232,20 +290,36 @@ async def create_record(
                 validated.planned_start,
                 validated.planned_end,
                 validated.remarks,
-                attachment_path,
-                attachment_original_name,
+                None,   # attachment_path — legacy column, new uploads go to record_attachments
+                None,   # attachment_original_name — legacy column
                 username,
                 now_iso,
             ),
         )
 
+        # Insert one record_attachments row per uploaded file.
+        for save_path, original_name, size in saved_files:
+            execute(
+                "INSERT INTO record_attachments "
+                "(record_id, file_path, original_filename, file_size_bytes, uploaded_by, uploaded_date) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (new_id, save_path, original_name, size, username, now_iso),
+            )
+
         new_row = fetch_one(
             "SELECT * FROM maintenance_records WHERE id = ?", (new_id,)
         )
-        return _row_to_record_out(new_row)
+        return _row_to_record_out(new_row, attachment_count=_get_attachment_count(new_id))
 
     except HTTPException:
         raise
+    except ValidationError as exc:
+        # Bug 1 fix: surface Pydantic field-level errors as 422 instead of swallowing as 500.
+        messages = "; ".join(e["msg"] for e in exc.errors())
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=messages,
+        )
     except Exception:
         logger.exception("Error creating maintenance record.")
         raise HTTPException(
@@ -269,7 +343,7 @@ async def update_record(
     operating_conditions: Optional[str] = Form(None),
     inventory_consumables: Optional[str] = Form(None),
     remarks: Optional[str] = Form(None),
-    attachment: Optional[UploadFile] = File(None),
+    attachments: list[UploadFile] = File(default=[]),
     current_user: dict = Depends(get_current_user),
 ) -> RecordOut:
     """Update a maintenance record.
@@ -278,6 +352,8 @@ async def update_record(
     - Administrators may update any record.
     - last_updated_time is always system-assigned; never accepted from client input.
     - created_time is never included in the UPDATE — it is immutable once set at creation.
+    - New files in this request are ADDED to existing attachments; they do not replace them.
+    - MAX_ATTACHMENTS_PER_RECORD is enforced as the total (existing + new).
     """
     try:
         role = current_user.get("role")
@@ -308,7 +384,6 @@ async def update_record(
             )
 
         # Validate updated text fields via Pydantic.
-        # planned_start/planned_end ordering is validated inside RecordUpdate.
         update_data = RecordUpdate(
             maintenance_type=maintenance_type,
             equipment_id=equipment_id,
@@ -320,11 +395,33 @@ async def update_record(
             remarks=remarks,
         )
 
+        # Filter empty UploadFile entries
+        valid_attachments = [a for a in attachments if a.filename]
+
+        # Enforce MAX_ATTACHMENTS_PER_RECORD as total (existing + new)
+        existing_count = _get_attachment_count(record_id)
+        if existing_count + len(valid_attachments) > MAX_ATTACHMENTS_PER_RECORD:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Adding {len(valid_attachments)} file(s) would exceed the maximum of "
+                    f"{MAX_ATTACHMENTS_PER_RECORD} attachments per record "
+                    f"(currently {existing_count})."
+                ),
+            )
+
+        # Phase 1: validate ALL new files before writing any
+        for att in valid_attachments:
+            _validate_attachment(att)
+
+        file_payloads: list[tuple[bytes, str]] = []
+        for att in valid_attachments:
+            contents = _read_and_check_size(att)
+            file_payloads.append((contents, att.filename or ""))
+
         now_iso = _now_utc_str()
 
-        # Build the full UPDATE statement with all domain fields explicitly listed.
-        # This ensures created_time is never touched and last_updated_time is always
-        # system-assigned — not derived from any client-submitted field.
+        # Update the record's domain and audit fields
         execute(
             """
             UPDATE maintenance_records
@@ -357,22 +454,30 @@ async def update_record(
             ),
         )
 
-        # Handle new attachment separately (after main field update)
-        if attachment and attachment.filename:
-            _validate_attachment(attachment)
-            att_path, att_name = _save_attachment(attachment)
+        # Phase 2: all files passed — persist and insert attachment rows
+        for contents, original_name in file_payloads:
+            save_path, original_name, size = _persist_file(contents, original_name)
             execute(
-                "UPDATE maintenance_records SET attachment_path = ?, attachment_original_name = ? WHERE id = ?",
-                (att_path, att_name, record_id),
+                "INSERT INTO record_attachments "
+                "(record_id, file_path, original_filename, file_size_bytes, uploaded_by, uploaded_date) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (record_id, save_path, original_name, size, username, now_iso),
             )
 
         updated_row = fetch_one(
             "SELECT * FROM maintenance_records WHERE id = ?", (record_id,)
         )
-        return _row_to_record_out(updated_row)
+        return _row_to_record_out(updated_row, attachment_count=_get_attachment_count(record_id))
 
     except HTTPException:
         raise
+    except ValidationError as exc:
+        # Bug 1 fix: surface Pydantic field-level errors as 422 instead of swallowing as 500.
+        messages = "; ".join(e["msg"] for e in exc.errors())
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=messages,
+        )
     except Exception:
         logger.exception("Error updating record id %s.", record_id)
         raise HTTPException(
@@ -422,35 +527,88 @@ async def delete_record(
 
 
 # ---------------------------------------------------------------------------
-# GET /api/attachments/{id} — stream attachment file
+# GET /api/records/{id}/attachments — list all attachments for a record
 # ---------------------------------------------------------------------------
 
-@router.get("/api/attachments/{record_id}")
-async def download_attachment(
+@router.get("/api/records/{record_id}/attachments")
+async def list_record_attachments(
     record_id: int,
     current_user: dict = Depends(get_current_user),
-):
-    """Stream the attachment file linked to a record using FileResponse.
+) -> list[AttachmentOut]:
+    """Return all attachment rows for a record. All roles. Empty list if none."""
+    try:
+        record_row = fetch_one(
+            "SELECT id FROM maintenance_records WHERE id = ? AND deleted_date IS NULL",
+            (record_id,),
+        )
+        if not record_row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Record {record_id} not found.",
+            )
 
-    Returns HTTP 404 if the record has no attachment or the file is missing.
+        rows = fetch_all(
+            "SELECT * FROM record_attachments WHERE record_id = ? ORDER BY id ASC",
+            (record_id,),
+        )
+        return [
+            AttachmentOut(
+                id=r["id"],
+                record_id=r["record_id"],
+                original_filename=r["original_filename"],
+                file_size_bytes=r["file_size_bytes"],
+                uploaded_by=r["uploaded_by"],
+                uploaded_date=r["uploaded_date"],
+            )
+            for r in rows
+        ]
+
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error listing attachments for record %s.", record_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while retrieving attachments.",
+        )
+
+
+# ---------------------------------------------------------------------------
+# GET /api/attachments/{attachment_id} — stream a specific attachment file
+# ---------------------------------------------------------------------------
+
+@router.get("/api/attachments/{attachment_id}")
+async def download_attachment(
+    attachment_id: int,
+    current_user: dict = Depends(get_current_user),
+):
+    """Stream the file for a specific record_attachments row. All roles.
+
+    Keyed by attachment_id (record_attachments.id), not by record_id.
+    Returns 404 if the attachment row does not exist, if the parent record is
+    soft-deleted, or if the physical file is missing from disk.
     """
     try:
         row = fetch_one(
-            "SELECT attachment_path, attachment_original_name "
-            "FROM maintenance_records WHERE id = ? AND deleted_date IS NULL",
-            (record_id,),
+            """
+            SELECT ra.*, mr.deleted_date AS record_deleted_date
+            FROM record_attachments ra
+            JOIN maintenance_records mr ON mr.id = ra.record_id
+            WHERE ra.id = ?
+            """,
+            (attachment_id,),
         )
-        if not row or not row["attachment_path"]:
+        if not row or row["record_deleted_date"] is not None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="No attachment found for this record.",
+                detail="Attachment not found.",
             )
 
-        file_path = row["attachment_path"]
+        file_path = row["file_path"]
         if not os.path.isfile(file_path):
             logger.error(
-                "Attachment file missing on disk for record %s: %s",
-                record_id,
+                "Attachment file missing on disk: attachment_id=%s, path=%s",
+                attachment_id,
                 file_path,
             )
             raise HTTPException(
@@ -460,14 +618,107 @@ async def download_attachment(
 
         return FileResponse(
             path=file_path,
-            filename=row["attachment_original_name"] or os.path.basename(file_path),
+            filename=row["original_filename"] or os.path.basename(file_path),
         )
 
     except HTTPException:
         raise
     except Exception:
-        logger.exception("Error serving attachment for record id %s.", record_id)
+        logger.exception("Error serving attachment id %s.", attachment_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred while retrieving the attachment.",
+        )
+
+
+# ---------------------------------------------------------------------------
+# DELETE /api/attachments/{attachment_id} — delete a specific attachment
+# ---------------------------------------------------------------------------
+
+@router.delete("/api/attachments/{attachment_id}", status_code=status.HTTP_200_OK)
+async def delete_attachment(
+    attachment_id: int,
+    current_user: dict = Depends(get_current_user),
+):
+    """Delete a specific attachment by its own ID.
+
+    - Engineers may only delete attachments from records they created.
+    - Administrators may delete any attachment.
+    - Ownership is verified via the parent record's created_by field (two-step join).
+    - Physical file deletion is non-fatal if the file is already missing from disk.
+    - Updates updated_by / updated_date on the parent record (this is a record edit).
+    """
+    try:
+        role = current_user.get("role")
+        username = current_user["sub"]
+
+        if role not in (ROLES["ADMIN"], ROLES["ENGINEER"]):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to delete attachments.",
+            )
+
+        # Fetch attachment + parent record ownership in one join
+        row = fetch_one(
+            """
+            SELECT ra.*,
+                   mr.created_by  AS record_created_by,
+                   mr.deleted_date AS record_deleted_date
+            FROM record_attachments ra
+            JOIN maintenance_records mr ON mr.id = ra.record_id
+            WHERE ra.id = ?
+            """,
+            (attachment_id,),
+        )
+        if not row or row["record_deleted_date"] is not None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Attachment not found.",
+            )
+
+        # Engineers may only delete attachments from records they own
+        if role == ROLES["ENGINEER"] and row["record_created_by"] != username:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Engineers may only delete attachments from records they created.",
+            )
+
+        # Attempt physical file deletion — non-fatal if already missing
+        file_path = row["file_path"]
+        try:
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+            else:
+                logger.warning(
+                    "Attachment file already missing on disk: attachment_id=%s, path=%s",
+                    attachment_id,
+                    file_path,
+                )
+        except OSError:
+            logger.warning(
+                "Could not delete attachment file: attachment_id=%s, path=%s",
+                attachment_id,
+                file_path,
+                exc_info=True,
+            )
+
+        # Delete the record_attachments row
+        execute("DELETE FROM record_attachments WHERE id = ?", (attachment_id,))
+
+        # Update parent record audit columns — removing an attachment is a record edit
+        now_iso = _now_utc_str()
+        execute(
+            "UPDATE maintenance_records SET updated_by = ?, updated_date = ? WHERE id = ?",
+            (username, now_iso, row["record_id"]),
+        )
+
+        return {"detail": f"Attachment {attachment_id} deleted successfully."}
+
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error deleting attachment id %s.", attachment_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while deleting the attachment.",
         )
