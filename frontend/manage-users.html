@@ -182,10 +182,11 @@
                 <th scope="col">Username</th>
                 <th scope="col">Role</th>
                 <th scope="col">Status</th>
+                <th scope="col">Action</th>
               </tr>
             </thead>
             <tbody id="users-tbody" aria-live="polite">
-              <!-- Rows injected by app.js renderUsersTable() -->
+              <!-- Rows injected by ui.js renderUsersTable() -->
             </tbody>
           </table>
 
@@ -204,6 +205,38 @@
 
 <!-- Toast container -->
 <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+<!-- =====================================================================
+     DOUBLE-CONFIRMATION MODAL (Changes 2 and 3)
+     Shared modal — body content is transformed in-place between Step 1 and Step 2
+     by openTypeToConfirmModal() in ui.js. Only one modal instance is needed.
+     ===================================================================== -->
+<div class="modal fade" id="type-to-confirm-modal" tabindex="-1"
+  aria-labelledby="type-to-confirm-modal-title" aria-hidden="true" role="dialog">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title" id="type-to-confirm-modal-title" style="font-size: 1rem;">
+          <!-- Title set dynamically by JS -->
+        </h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <!-- Step 1 body — shown initially -->
+      <div class="modal-body" id="confirm-modal-step1-body">
+        <!-- Content set dynamically by JS -->
+      </div>
+      <!-- Step 2 body — type-to-confirm; hidden until Step 1 continues -->
+      <div class="modal-body d-none" id="confirm-modal-step2-body">
+        <p>Type <strong id="confirmUsernameTarget"></strong> to confirm this action.</p>
+        <input type="text" class="form-control mt-2" id="confirmUsernameInput" autocomplete="off"
+          aria-label="Type username to confirm" />
+      </div>
+      <div class="modal-footer" id="confirm-modal-footer">
+        <!-- Buttons set dynamically by JS -->
+      </div>
+    </div>
+  </div>
+</div>
 
 <script src="js/bootstrap.bundle.min.js"></script>
 <script src="js/constants.js"></script>
