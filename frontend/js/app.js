@@ -281,10 +281,10 @@ function attachRowClickListeners(role, username) {
  * @param {number} recordId
  * @param {string} filename
  */
-async function handleDownload(e, recordId, filename) {
+async function handleDownload(e, attachmentId, filename) {
   e.preventDefault();
   try {
-    await downloadAttachment(recordId, filename);
+    await downloadAttachment(attachmentId, filename);
   } catch (err) {
     showToast(err.message || "Failed to download attachment.", "error");
   }
@@ -313,6 +313,11 @@ function handleDeleteClick(recordId, buttonEl) {
 /**
  * Initialize the record creation / edit form page.
  * Detects page by checking for #record-form.
+ *
+ * Changes added:
+ *   - Change 1.5: Wire Delete button (edit mode + Administrator only)
+ *   - Change 4.4: Wire Remove Attachment button
+ *   - Change 4.5: Wire Clear file button
  */
 async function initFormPage() {
   const form = document.getElementById("record-form");
@@ -347,13 +352,162 @@ async function initFormPage() {
   if (pageTitle) pageTitle.textContent = isEdit ? "Edit Maintenance Record" : "New Maintenance Record";
   if (submitBtn) submitBtn.textContent = isEdit ? "Update Record" : "Save Record";
 
-  // For edit mode, load and pre-populate the form
+  // ── Change 1.5: Delete button — visible only in edit mode for Administrators ──
+  const deleteBtn = document.getElementById("btn-delete-record");
+  if (deleteBtn) {
+    const showDelete = isEdit && role === ROLES.ADMIN;
+    deleteBtn.classList.toggle("d-none", !showDelete);
+  }
+
+  // ── Multi-attachment state ──
+  // _newFiles: Files selected for upload in this session (not yet sent to the server)
+  const _newFiles = [];
+  // _pendingRemoveAttachmentId: attachment_id waiting for modal confirmation
+  let _pendingRemoveAttachmentId = null;
+
+  /**
+   * Re-render the list of newly-selected (not yet uploaded) files.
+   * Each entry shows name, size, inline validation warnings, and a per-entry Clear button.
+   * Uses createElement/textContent only — no innerHTML with file data.
+   */
+  function renderNewFilesList() {
+    const container = document.getElementById("new-attachments-list");
+    if (!container) return;
+    container.textContent = "";
+
+    _newFiles.forEach((file, idx) => {
+      const item = document.createElement("div");
+      item.className = "attachment-item d-flex align-items-center gap-2 mb-1 flex-wrap";
+
+      const icon = document.createElement("span");
+      icon.setAttribute("aria-hidden", "true");
+      icon.textContent = "\uD83D\uDCC4";  // 📄
+      item.appendChild(icon);
+
+      const nameSpan = document.createElement("span");
+      nameSpan.className = "file-info-name";
+      nameSpan.textContent = file.name;
+      item.appendChild(nameSpan);
+
+      const sizeSpan = document.createElement("span");
+      sizeSpan.className = "file-info-size";
+      sizeSpan.style.fontSize = "var(--font-size-xs)";
+      sizeSpan.textContent = `(${(file.size / (1024 * 1024)).toFixed(2)} MB)`;
+      item.appendChild(sizeSpan);
+
+      const clearBtn = document.createElement("button");
+      clearBtn.type = "button";
+      clearBtn.className = "btn btn-sm btn-link p-0";
+      clearBtn.style.fontSize = "var(--font-size-xs)";
+      clearBtn.style.color = "var(--color-text-muted)";
+      clearBtn.textContent = "Clear";
+      clearBtn.addEventListener("click", () => {
+        _newFiles.splice(idx, 1);
+        renderNewFilesList();
+      });
+      item.appendChild(clearBtn);
+
+      // Inline validation warnings
+      const typeResult = validateFileType(file);
+      const sizeResult = validateFileSize(file, DEFAULT_MAX_UPLOAD_MB);
+      const warnings = [];
+      if (!typeResult.valid) warnings.push(typeResult.message);
+      if (!sizeResult.valid) warnings.push(sizeResult.message);
+      if (warnings.length > 0) {
+        const warnSpan = document.createElement("span");
+        warnSpan.className = "file-warning";
+        warnSpan.style.fontSize = "var(--font-size-xs)";
+        warnSpan.textContent = warnings.join(" ");
+        item.appendChild(warnSpan);
+      }
+
+      container.appendChild(item);
+    });
+  }
+
+  /**
+   * Fetch and render the list of existing (already uploaded) attachments for a record.
+   * Shows/hides the currentAttachmentBlock based on whether any attachments exist.
+   * Each entry has a download link and (for Admins and Engineers) a per-attachment Remove button.
+   * @param {number} recordId
+   */
+  async function renderExistingAttachments(recordId) {
+    const container  = document.getElementById("current-attachments-list");
+    const attachBlock = document.getElementById("currentAttachmentBlock");
+
+    let attachments = [];
+    try {
+      attachments = await getRecordAttachments(recordId);
+    } catch (err) {
+      if (attachBlock) attachBlock.classList.add("d-none");
+      return;
+    }
+
+    if (!container) return;
+    container.textContent = "";
+
+    if (attachments.length === 0) {
+      if (attachBlock) attachBlock.classList.add("d-none");
+      return;
+    }
+
+    if (attachBlock) attachBlock.classList.remove("d-none");
+
+    const canRemove = (role === ROLES.ADMIN) || (role === ROLES.ENGINEER);
+
+    attachments.forEach((att) => {
+      const item = document.createElement("div");
+      item.className = "attachment-item d-flex align-items-center gap-2 mb-1 flex-wrap";
+
+      // Download link — href="#", actual download triggered via API with auth header
+      const link = document.createElement("a");
+      link.setAttribute("href", "#");
+      link.textContent = att.original_filename;
+      link.addEventListener("click", (e) => {
+        e.preventDefault();
+        downloadAttachment(att.id, att.original_filename).catch((err) => {
+          showToast(err.message || "Failed to download file.", "error");
+        });
+      });
+      item.appendChild(link);
+
+      if (att.file_size_bytes) {
+        const sizeSpan = document.createElement("span");
+        sizeSpan.className = "file-info-size";
+        sizeSpan.style.fontSize = "var(--font-size-xs)";
+        sizeSpan.textContent = `(${(att.file_size_bytes / (1024 * 1024)).toFixed(2)} MB)`;
+        item.appendChild(sizeSpan);
+      }
+
+      if (canRemove) {
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "btn btn-sm btn-link p-0";
+        removeBtn.style.fontSize = "var(--font-size-xs)";
+        removeBtn.style.color = "var(--color-danger)";
+        removeBtn.textContent = "Remove";
+        removeBtn.addEventListener("click", () => {
+          _pendingRemoveAttachmentId = att.id;
+          const modal = document.getElementById("remove-attachment-modal");
+          if (modal) new bootstrap.Modal(modal).show();
+        });
+        item.appendChild(removeBtn);
+      }
+
+      container.appendChild(item);
+    });
+  }
+
+  // For edit mode, load and pre-populate the form then fetch existing attachments
+  let editRecord = null;
   if (isEdit) {
     try {
       const records = await getRecords({});
-      const record  = records.find((r) => r.id === editId);
-      if (record) {
-        populateForm(record);
+      editRecord = records.find((r) => r.id === editId) || null;
+      if (editRecord) {
+        populateForm(editRecord);
+        // Render existing attachments list (replaces old single-attachment block)
+        await renderExistingAttachments(editId);
       } else {
         showToast("Record not found.", "error");
       }
@@ -362,38 +516,68 @@ async function initFormPage() {
     }
   }
 
-  // File input — show info on selection
-  const fileInput   = document.getElementById("field-attachment");
-  const fileInfoRow = document.getElementById("file-info-row");
-  const fileInfoName = document.getElementById("file-info-name");
-  const fileInfoSize = document.getElementById("file-info-size");
-  const fileWarning  = document.getElementById("file-warning");
+  // ── File input — accumulate selected files into _newFiles list ──
+  const fileInput = document.getElementById("field-attachment");
 
   if (fileInput) {
     fileInput.addEventListener("change", () => {
-      const file = fileInput.files[0];
-      if (!file) {
-        if (fileInfoRow) fileInfoRow.classList.remove("visible");
-        return;
-      }
+      // Merge newly-selected files into the pending list
+      Array.from(fileInput.files).forEach((f) => _newFiles.push(f));
+      // Reset the input so the same file can be re-selected after clearing
+      fileInput.value = "";
+      renderNewFilesList();
+    });
+  }
 
-      if (fileInfoRow)  fileInfoRow.classList.add("visible");
-      if (fileInfoName) fileInfoName.textContent = file.name;
-      if (fileInfoSize) {
-        const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
-        fileInfoSize.textContent = `${sizeMB} MB`;
-      }
+  // ── Delete button — wire to confirmation modal (unchanged logic) ──
+  if (deleteBtn && isEdit && role === ROLES.ADMIN) {
+    const formDeleteModal  = document.getElementById("form-delete-modal");
+    const confirmDeleteBtn = document.getElementById("btn-confirm-delete-record");
 
-      // Show inline warnings for type/size
-      const typeResult = validateFileType(file);
-      const sizeResult = validateFileSize(file, DEFAULT_MAX_UPLOAD_MB);
-      const warnings = [];
-      if (!typeResult.valid) warnings.push(typeResult.message);
-      if (!sizeResult.valid) warnings.push(sizeResult.message);
+    if (formDeleteModal && confirmDeleteBtn) {
+      deleteBtn.addEventListener("click", () => {
+        const bsModal = new bootstrap.Modal(formDeleteModal);
+        bsModal.show();
+      });
 
-      if (fileWarning) {
-        fileWarning.textContent = warnings.join(" ");
-        fileWarning.style.display = warnings.length ? "block" : "none";
+      confirmDeleteBtn.addEventListener("click", async () => {
+        setLoading(confirmDeleteBtn, true);
+        try {
+          await deleteRecord(editId);
+          const bsModal = bootstrap.Modal.getInstance(formDeleteModal);
+          if (bsModal) bsModal.hide();
+          showToast("Record deleted successfully.", "success");
+          setTimeout(() => window.location.replace("dashboard.html"), SUCCESS_REDIRECT_DELAY_MS);
+        } catch (err) {
+          showToast(err.message || "Failed to delete record.", "error");
+          setLoading(confirmDeleteBtn, false);
+        }
+      });
+    }
+  }
+
+  // ── Remove Attachment confirm modal — driven by per-attachment Remove buttons ──
+  // _pendingRemoveAttachmentId is set by each Remove button before the modal opens.
+  const removeAttachmentModal  = document.getElementById("remove-attachment-modal");
+  const confirmRemoveAttachBtn = document.getElementById("btn-confirm-remove-attachment");
+
+  if (removeAttachmentModal && confirmRemoveAttachBtn) {
+    confirmRemoveAttachBtn.addEventListener("click", async () => {
+      if (!_pendingRemoveAttachmentId) return;
+      const attachId = _pendingRemoveAttachmentId;
+      setLoading(confirmRemoveAttachBtn, true);
+      try {
+        await deleteAttachment(attachId);
+        const bsModal = bootstrap.Modal.getInstance(removeAttachmentModal);
+        if (bsModal) bsModal.hide();
+        _pendingRemoveAttachmentId = null;
+        // Re-render the existing attachments list to reflect the deletion
+        if (isEdit) await renderExistingAttachments(editId);
+        showToast("Attachment removed successfully.", "success");
+      } catch (err) {
+        showToast(err.message || "Failed to remove attachment.", "error");
+      } finally {
+        setLoading(confirmRemoveAttachBtn, false);
       }
     });
   }
@@ -411,8 +595,6 @@ async function initFormPage() {
     const operatingConditions  = document.getElementById("field-operating-conditions")?.value ?? "";
     const inventoryConsumables = document.getElementById("field-inventory-consumables")?.value ?? "";
     const remarks              = document.getElementById("field-remarks")?.value ?? "";
-    const file                 = fileInput?.files[0] ?? null;
-
     // Run all per-field validators and collect errors
     const validations = [
       { fieldId: "field-maintenance-type",      result: validateMaintenanceType(maintenanceType) },
@@ -427,10 +609,13 @@ async function initFormPage() {
       { fieldId: "field-remarks",               result: validateMaxLength(remarks, MAX_REMARKS_LENGTH, "Remarks") },
     ];
 
-    if (file) {
-      validations.push({ fieldId: "field-attachment", result: validateFileType(file) });
-      validations.push({ fieldId: "field-attachment", result: validateFileSize(file, DEFAULT_MAX_UPLOAD_MB) });
-    }
+    // Validate each pending new file for type and size
+    _newFiles.forEach((file) => {
+      const typeResult = validateFileType(file);
+      const sizeResult = validateFileSize(file, DEFAULT_MAX_UPLOAD_MB);
+      if (!typeResult.valid) validations.push({ fieldId: "field-attachment", result: typeResult });
+      if (!sizeResult.valid) validations.push({ fieldId: "field-attachment", result: sizeResult });
+    });
 
     let hasErrors = false;
     validations.forEach(({ fieldId, result }) => {
@@ -449,7 +634,7 @@ async function initFormPage() {
 
     if (hasErrors) return;
 
-    // Build FormData — field names match the name attributes on the HTML inputs
+    // Build FormData — field names match backend Form() parameter names
     const formData = new FormData();
     formData.append("maintenance_type",   maintenanceType);
     formData.append("equipment_id",       equipmentId.trim());
@@ -459,7 +644,8 @@ async function initFormPage() {
     if (operatingConditions)   formData.append("operating_conditions",   operatingConditions);
     if (inventoryConsumables)  formData.append("inventory_consumables",  inventoryConsumables);
     if (remarks)               formData.append("remarks",                remarks);
-    if (file)                  formData.append("attachment",             file);
+    // Append each new file as a separate "attachments" field entry
+    _newFiles.forEach((file) => formData.append("attachments", file));
 
     setLoading(submitBtn, true);
     try {
@@ -485,40 +671,13 @@ async function initFormPage() {
 // ---------------------------------------------------------------------------
 
 /**
- * Render the existing users table on manage-users.html.
- * @param {Array} users
- */
-function renderUsersTable(users) {
-  const tbody = document.getElementById("users-tbody");
-  if (!tbody) return;
-
-  if (!users || users.length === 0) {
-    tbody.innerHTML = "";
-    const empty = document.getElementById("users-empty-state");
-    if (empty) empty.style.display = "block";
-    return;
-  }
-
-  const empty = document.getElementById("users-empty-state");
-  if (empty) empty.style.display = "none";
-
-  tbody.innerHTML = users.map((u) => {
-    const statusClass = u.is_active ? "type-badge-conducted" : "type-badge-planned";
-    const statusText  = u.is_active ? "Active" : "Inactive";
-    return `
-      <tr>
-        <td><span class="record-id-badge">#${u.id}</span></td>
-        <td>${escapeHtml(u.username)}</td>
-        <td>${escapeHtml(u.role)}</td>
-        <td><span class="type-badge ${statusClass}">${statusText}</span></td>
-      </tr>
-    `;
-  }).join("");
-}
-
-/**
  * Initialize the manage-users page.
  * Detects page by checking for #create-user-form.
+ *
+ * Changes:
+ *   - Change 2: Existing users table extended with Action column + double-confirmation toggle
+ *   - Change 3: Create User form intercepted for double-confirmation before API call
+ *   - renderUsersTable() is now in ui.js (rewritten); the old version here is removed
  */
 async function initManageUsersPage() {
   const form = document.getElementById("create-user-form");
@@ -547,21 +706,58 @@ async function initManageUsersPage() {
     logoutBtn.addEventListener("click", () => logout());
   }
 
-  const submitBtn = document.getElementById("btn-create-user");
+  const submitBtn     = document.getElementById("btn-create-user");
+  const currentUser   = getUsername();
 
-  // Load existing users table
+  // ── Load (and re-load) the existing users table ──
   async function loadUsers() {
     try {
       const users = await getUsers();
-      renderUsersTable(users);
+      // Pass the current username and the toggle callback to renderUsersTable (ui.js)
+      renderUsersTable(users, currentUser, handleToggleClick);
     } catch (err) {
       showToast(err.message || "Failed to load users.", "error");
     }
   }
 
+  /**
+   * Change 2.3 — Double-confirmation flow for Activate/Deactivate toggle.
+   * Called by renderUsersTable when a toggle button is clicked.
+   * @param {object} user - The user object from the users list
+   */
+  function handleToggleClick(user) {
+    const newStatus   = !user.is_active;
+    const actionVerb  = user.is_active ? "Deactivate" : "Activate";
+    const actionLabel = user.is_active ? "Confirm Deactivation" : "Confirm Activation";
+    const message     = user.is_active
+      ? `Deactivate user '${user.username}'? They will be immediately unable to log in.`
+      : `Activate user '${user.username}'? They will be able to log in immediately.`;
+
+    openTypeToConfirmModal({
+      title:             `${actionVerb} User`,
+      message:           message,
+      confirmTargetText: user.username,
+      confirmButtonLabel: actionLabel,
+      onConfirmed: async () => {
+        try {
+          await updateUser(user.id, { is_active: newStatus });
+          showToast(
+            `User "${user.username}" ${newStatus ? "activated" : "deactivated"} successfully.`,
+            "success"
+          );
+          // Refresh the users table to reflect the updated status
+          await loadUsers();
+        } catch (err) {
+          showToast(err.message || `Failed to ${actionVerb.toLowerCase()} user.`, "error");
+        }
+      },
+    });
+  }
+
+  // Initial load
   loadUsers();
 
-  // Form submit
+  // ── Change 3.1 — Create User form: intercept submit for double-confirmation ──
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     clearFieldErrors();
@@ -571,7 +767,7 @@ async function initManageUsersPage() {
     const confirmVal   = document.getElementById("new-confirm-password")?.value ?? "";
     const roleVal      = document.getElementById("new-role")?.value ?? "";
 
-    // Run all validators simultaneously
+    // Run all validators first — do not proceed if any fail (unchanged validation logic)
     const validations = [
       { fieldId: "new-username",          result: validateUsername(usernameVal) },
       { fieldId: "new-password",          result: validatePassword(passwordVal) },
@@ -589,22 +785,38 @@ async function initManageUsersPage() {
 
     if (hasErrors) return;
 
-    setLoading(submitBtn, true);
-    try {
-      await createUser({
-        username: usernameVal.trim(),
-        password: passwordVal,
-        role:     roleVal,
-      });
-      showToast(`User "${usernameVal.trim()}" created successfully.`, "success");
-      form.reset();
-      clearFieldErrors();
-      loadUsers();
-    } catch (err) {
-      showToast(err.message || "Failed to create user.", "error");
-    } finally {
-      setLoading(submitBtn, false);
-    }
+    // Validation passed — open double-confirmation modal (Change 3.1)
+    // The role shown in the modal is the human-readable label from the select, not a raw enum.
+    const roleLabel = document.getElementById("new-role")?.options[
+      document.getElementById("new-role")?.selectedIndex
+    ]?.text || roleVal;
+
+    const summaryMessage = `Create new user account?\n\nUsername: ${usernameVal.trim()}\nRole: ${roleLabel}`;
+
+    openTypeToConfirmModal({
+      title:             "Create New User",
+      message:           summaryMessage,
+      confirmTargetText: usernameVal.trim(),
+      confirmButtonLabel: "Confirm Creation",
+      onConfirmed: async () => {
+        setLoading(submitBtn, true);
+        try {
+          await createUser({
+            username: usernameVal.trim(),
+            password: passwordVal,
+            role:     roleVal,
+          });
+          showToast(`User "${usernameVal.trim()}" created successfully.`, "success");
+          form.reset();
+          clearFieldErrors();
+          await loadUsers();
+        } catch (err) {
+          showToast(err.message || "Failed to create user.", "error");
+        } finally {
+          setLoading(submitBtn, false);
+        }
+      },
+    });
   });
 }
 
@@ -668,8 +880,10 @@ async function initRecordDetailPage() {
     return;
   }
 
-  // --- Section 1: Populate record fields ---
+  // --- Section 1: Populate record fields and attachments ---
   _populateDetailFields(record);
+  // Attachments are fetched async and rendered after the main fields are set
+  _populateDetailAttachments(record.id);
 
   // Populate the record header strip with equipment ID
   const headerIdEl   = document.getElementById("detail-header-id");
@@ -871,24 +1085,69 @@ function _populateDetailFields(record) {
   setDetailField("detail-planned-end",       formatDisplayDate(record.planned_end));
   setDetailField("detail-last-updated-time", formatDisplayDate(record.last_updated_time));
 
-  // Attachment — use setAttribute, never innerHTML
+  // Attachments are rendered asynchronously by _populateDetailAttachments()
+  // called after this function returns — see initRecordDetailPage().
+}
+
+/**
+ * Fetch and render the attachments list for the record detail page.
+ * Populates #detail-attachment with a clickable list of attachment links.
+ * Uses createElement and textContent only — no innerHTML with server data.
+ * @param {number} recordId
+ */
+async function _populateDetailAttachments(recordId) {
   const attachEl = document.getElementById("detail-attachment");
-  if (attachEl) {
-    attachEl.textContent = "";
-    if (record.attachment_original_name) {
-      const link = document.createElement("a");
-      link.setAttribute("href", "#");
-      link.textContent = record.attachment_original_name;
-      link.className = "attachment-link";
-      link.addEventListener("click", (e) => {
-        e.preventDefault();
-        handleDownload(e, record.id, record.attachment_original_name);
-      });
-      attachEl.appendChild(link);
-    } else {
-      attachEl.textContent = "\u2014";
-    }
+  if (!attachEl) return;
+
+  attachEl.textContent = "";
+
+  let attachments = [];
+  try {
+    attachments = await getRecordAttachments(recordId);
+  } catch (_) {
+    attachEl.textContent = "\u2014";
+    return;
   }
+
+  if (attachments.length === 0) {
+    attachEl.textContent = "\u2014";
+    return;
+  }
+
+  const list = document.createElement("ul");
+  list.style.listStyle = "none";
+  list.style.padding = "0";
+  list.style.margin = "0";
+
+  attachments.forEach((att) => {
+    const li = document.createElement("li");
+    li.style.marginBottom = "6px";
+
+    const link = document.createElement("a");
+    link.setAttribute("href", "#");
+    link.textContent = att.original_filename;
+    link.className = "attachment-link";
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      downloadAttachment(att.id, att.original_filename).catch((err) => {
+        showToast(err.message || "Failed to download file.", "error");
+      });
+    });
+    li.appendChild(link);
+
+    if (att.file_size_bytes) {
+      const meta = document.createElement("span");
+      meta.style.fontSize = "var(--font-size-xs)";
+      meta.style.marginLeft = "8px";
+      meta.style.color = "var(--color-text-muted)";
+      meta.textContent = "(" + (att.file_size_bytes / (1024 * 1024)).toFixed(2) + " MB)";
+      li.appendChild(meta);
+    }
+
+    list.appendChild(li);
+  });
+
+  attachEl.appendChild(list);
 }
 
 /**

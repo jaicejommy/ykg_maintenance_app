@@ -173,6 +173,10 @@ function populateNavbar() {
  * Build and inject table rows for maintenance records.
  * Conditionally renders Edit/Delete buttons based on user role and ownership.
  * Uses appendCell() and formatDisplayDate() helpers throughout — no innerHTML with record data.
+ *
+ * The Attachment column now shows a file count (record.attachment_count) instead of a
+ * single download link, since records can now have multiple attachments.
+ *
  * @param {Array<object>} records
  * @param {string} userRole
  * @param {string} username
@@ -244,18 +248,15 @@ function renderRecordsTable(records, userRole, username) {
     // Last Updated — after Planned End per spec
     appendCell(row, formatDisplayDate(record.last_updated_time));
 
-    // Attachment cell — link or dash; uses setAttribute/textContent, never innerHTML
+    // Attachment count cell — shows "N file(s)" or "—"; no download link
+    // (users click the row to reach the detail page where individual files are listed).
     const attachTd = document.createElement("td");
-    if (record.attachment_original_name) {
-      const link = document.createElement("a");
-      link.setAttribute("href", "#");
-      link.className = "attachment-link";
-      link.textContent = record.attachment_original_name;
-      link.addEventListener("click", (e) => {
-        e.stopPropagation();
-        handleDownload(e, record.id, record.attachment_original_name);
-      });
-      attachTd.appendChild(link);
+    const attachCount = record.attachment_count || 0;
+    if (attachCount > 0) {
+      const countSpan = document.createElement("span");
+      countSpan.className = "attachment-count-badge";
+      countSpan.textContent = attachCount === 1 ? "1 file" : `${attachCount} files`;
+      attachTd.appendChild(countSpan);
     } else {
       const dash = document.createElement("span");
       dash.className = "attachment-dash";
@@ -342,6 +343,8 @@ function formatDisplayDate(isoString) {
 
 /**
  * Populate the form.html fields from an existing record object.
+ * Only populates text/select/textarea fields. Existing attachment display is
+ * handled separately by renderExistingAttachments() in app.js.
  * @param {object} record
  */
 function populateForm(record) {
@@ -368,25 +371,16 @@ function populateForm(record) {
 
   setValue("field-planned-start", toDatetimeLocal(record.planned_start));
   setValue("field-planned-end",   toDatetimeLocal(record.planned_end));
-
-  // Show existing attachment info
-  if (record.attachment_original_name) {
-    const fileInfo = document.getElementById("file-info-row");
-    const fileName = document.getElementById("file-info-name");
-    const currentAttach = document.getElementById("current-attachment");
-    if (fileInfo)     fileInfo.classList.add("visible");
-    if (fileName)     fileName.textContent = record.attachment_original_name + " (existing)";
-    if (currentAttach) currentAttach.textContent = record.attachment_original_name;
-  }
 }
 
 // ---------------------------------------------------------------------------
-// Record detail modal
+// Record detail modal (legacy helper — kept for compatibility)
 // ---------------------------------------------------------------------------
 
 /**
  * Populate and open the #recordDetailModal for a given record.
  * Uses textContent and setAttribute only — no innerHTML with record data.
+ * The attachment panel now shows a file count rather than a single download link.
  * @param {object} record
  * @param {string} userRole
  * @param {string} username
@@ -414,23 +408,13 @@ function showRecordDetail(record, userRole, username) {
   set("detail-updated-by",            record.updated_by);
   set("detail-updated-date",          record.updated_date);
 
-  // Attachment — use setAttribute, never innerHTML
+  // Attachment — show count only (individual downloads available on detail page)
   const attachEl = document.getElementById("detail-attachment");
   if (attachEl) {
-    attachEl.textContent = "";
-    if (record.attachment_original_name) {
-      const link = document.createElement("a");
-      link.setAttribute("href", `${API_BASE}/api/attachments/${record.id}`);
-      link.textContent = record.attachment_original_name;
-      link.className = "attachment-link";
-      link.addEventListener("click", (e) => {
-        e.preventDefault();
-        handleDownload(e, record.id, record.attachment_original_name);
-      });
-      attachEl.appendChild(link);
-    } else {
-      attachEl.textContent = "\u2014";
-    }
+    const count = record.attachment_count || 0;
+    attachEl.textContent = count > 0
+      ? (count === 1 ? "1 file" : `${count} files`)
+      : "\u2014";
   }
 
   // Edit button visibility
@@ -449,6 +433,232 @@ function showRecordDetail(record, userRole, username) {
   }
 
   new bootstrap.Modal(modal).show();
+}
+
+// ---------------------------------------------------------------------------
+// Users table rendering (Change 2.4)
+// ---------------------------------------------------------------------------
+
+/**
+ * Build and inject table rows for the existing users table on manage-users.html.
+ * Uses createElement and textContent exclusively — never innerHTML with user data.
+ *
+ * The row for the currently logged-in Administrator has its Action button replaced
+ * with "(Your Account)" and disabled — this is the client-side mirror of the backend
+ * safeguard; the server-side check is the actual security boundary.
+ *
+ * @param {Array<object>} users - Array of user objects from GET /api/users
+ * @param {string} currentUsername - Username of the currently logged-in Administrator
+ * @param {function} onToggleClick - Callback(user) invoked when a toggle button is clicked
+ */
+function renderUsersTable(users, currentUsername, onToggleClick) {
+  const tbody = document.getElementById("users-tbody");
+  const emptyState = document.getElementById("users-empty-state");
+
+  if (!tbody) return;
+
+  if (!users || users.length === 0) {
+    tbody.textContent = "";
+    if (emptyState) emptyState.style.display = "block";
+    return;
+  }
+
+  if (emptyState) emptyState.style.display = "none";
+
+  // Clear existing rows safely
+  tbody.textContent = "";
+
+  users.forEach((user, index) => {
+    const row = document.createElement("tr");
+
+    // # column
+    const idTd = document.createElement("td");
+    const idBadge = document.createElement("span");
+    idBadge.className = "record-id-badge";
+    idBadge.textContent = "#" + user.id;
+    idTd.appendChild(idBadge);
+    row.appendChild(idTd);
+
+    // Username column
+    const usernameTd = document.createElement("td");
+    usernameTd.textContent = user.username;
+    row.appendChild(usernameTd);
+
+    // Role column
+    const roleTd = document.createElement("td");
+    roleTd.textContent = user.role;
+    row.appendChild(roleTd);
+
+    // Status column — badge styled via CSS variables
+    const statusTd = document.createElement("td");
+    const statusBadge = document.createElement("span");
+    statusBadge.className = "type-badge " + (user.is_active ? "type-badge-conducted" : "type-badge-planned");
+    statusBadge.textContent = user.is_active ? "Active" : "Deactivated";
+    statusTd.appendChild(statusBadge);
+    row.appendChild(statusTd);
+
+    // Action column
+    const actionTd = document.createElement("td");
+    const isOwnAccount = (user.username === currentUsername);
+
+    if (isOwnAccount) {
+      // Disabled placeholder — no action on own account (client-side mirror of server guard)
+      const ownLabel = document.createElement("span");
+      ownLabel.className = "text-muted-custom";
+      ownLabel.style.fontSize = "var(--font-size-sm)";
+      ownLabel.textContent = "(Your Account)";
+      actionTd.appendChild(ownLabel);
+    } else {
+      const toggleBtn = document.createElement("button");
+      toggleBtn.className = user.is_active
+        ? "btn btn-sm btn-outline-secondary"
+        : "btn btn-sm btn-outline-secondary";
+      toggleBtn.textContent = user.is_active ? "Deactivate" : "Activate";
+      toggleBtn.addEventListener("click", () => {
+        if (onToggleClick) onToggleClick(user);
+      });
+      actionTd.appendChild(toggleBtn);
+    }
+
+    row.appendChild(actionTd);
+    tbody.appendChild(row);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Double-confirmation modal — shared between Change 2 and Change 3 (Change 3.2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Open the shared #type-to-confirm-modal and drive the two-step confirmation flow.
+ *
+ * Step 1: Shows a summary message with Cancel and Continue buttons.
+ * Step 2 (in-place transformation): Shows a type-to-confirm input. The finalConfirmBtn
+ *         stays disabled until the typed value exactly matches confirmTargetText (case-sensitive).
+ *
+ * This single function powers both the user deactivation/activation flow (Change 2)
+ * and the user creation flow (Change 3). It does NOT power the record delete flow
+ * (Change 1) — that uses a simpler single-step confirmation modal in form.html.
+ *
+ * @param {object} options
+ * @param {string} options.title              - Modal title text
+ * @param {string} options.message            - Step 1 body message (plain text, set via textContent)
+ * @param {string} options.confirmTargetText  - The exact string the user must type in Step 2
+ * @param {string} options.confirmButtonLabel - Label for the final confirm button in Step 2
+ * @param {function} options.onConfirmed      - Async callback invoked after typed confirmation matches
+ */
+function openTypeToConfirmModal({
+  title,
+  message,
+  confirmTargetText,
+  confirmButtonLabel,
+  onConfirmed,
+}) {
+  const modalEl = document.getElementById("type-to-confirm-modal");
+  if (!modalEl) return;
+
+  // Retrieve shared sub-elements
+  const titleEl    = document.getElementById("type-to-confirm-modal-title");
+  const step1Body  = document.getElementById("confirm-modal-step1-body");
+  const step2Body  = document.getElementById("confirm-modal-step2-body");
+  const footer     = document.getElementById("confirm-modal-footer");
+  const targetSpan = document.getElementById("confirmUsernameTarget");
+  const inputEl    = document.getElementById("confirmUsernameInput");
+
+  if (!titleEl || !step1Body || !step2Body || !footer || !targetSpan || !inputEl) return;
+
+  // ── Reset modal to Step 1 state ──
+  titleEl.textContent = title;
+
+  // Clear and populate Step 1 body using textContent (never innerHTML with data)
+  step1Body.textContent = "";
+  const msgP = document.createElement("p");
+  msgP.textContent = message;
+  step1Body.appendChild(msgP);
+
+  step1Body.classList.remove("d-none");
+  step2Body.classList.add("d-none");
+
+  // Reset Step 2 input
+  inputEl.value = "";
+  targetSpan.textContent = confirmTargetText;
+
+  // ── Build Step 1 footer: Cancel + Continue ──
+  footer.textContent = "";
+
+  const cancelBtn1 = document.createElement("button");
+  cancelBtn1.type = "button";
+  cancelBtn1.className = "btn btn-secondary";
+  cancelBtn1.setAttribute("data-bs-dismiss", "modal");
+  cancelBtn1.textContent = "Cancel";
+  footer.appendChild(cancelBtn1);
+
+  const continueBtn = document.createElement("button");
+  continueBtn.type = "button";
+  continueBtn.className = "btn btn-primary";
+  continueBtn.textContent = "Continue";
+  footer.appendChild(continueBtn);
+
+  // ── Step 1 → Step 2 transformation on Continue ──
+  continueBtn.addEventListener("click", () => {
+    // Transform body in-place
+    step1Body.classList.add("d-none");
+    step2Body.classList.remove("d-none");
+
+    // Reset and focus the input
+    inputEl.value = "";
+    inputEl.focus();
+
+    // ── Build Step 2 footer: Cancel + disabled Confirm ──
+    footer.textContent = "";
+
+    const cancelBtn2 = document.createElement("button");
+    cancelBtn2.type = "button";
+    cancelBtn2.className = "btn btn-secondary";
+    cancelBtn2.setAttribute("data-bs-dismiss", "modal");
+    cancelBtn2.textContent = "Cancel";
+    footer.appendChild(cancelBtn2);
+
+    const finalConfirmBtn = document.createElement("button");
+    finalConfirmBtn.type = "button";
+    finalConfirmBtn.className = "btn btn-danger";
+    finalConfirmBtn.id = "finalConfirmBtn";
+    finalConfirmBtn.textContent = confirmButtonLabel;
+    finalConfirmBtn.disabled = true;
+    footer.appendChild(finalConfirmBtn);
+
+    // Enable final button only when typed value exactly matches — case-sensitive
+    const onInput = () => {
+      finalConfirmBtn.disabled = (inputEl.value !== confirmTargetText);
+    };
+    inputEl.addEventListener("input", onInput);
+
+    // ── Final confirm click ──
+    finalConfirmBtn.addEventListener("click", async () => {
+      // Guard: only proceed if match is still exact (defensive)
+      if (inputEl.value !== confirmTargetText) return;
+
+      // Close the modal before executing the action
+      const bsModal = bootstrap.Modal.getInstance(modalEl);
+      if (bsModal) bsModal.hide();
+
+      // Invoke the caller's confirmed callback
+      if (onConfirmed) {
+        await onConfirmed();
+      }
+    });
+  });
+
+  // ── Clean up input listener when modal is hidden ──
+  const onHidden = () => {
+    inputEl.removeEventListener("input", () => {});
+    modalEl.removeEventListener("hidden.bs.modal", onHidden);
+  };
+  modalEl.addEventListener("hidden.bs.modal", onHidden);
+
+  // ── Show the modal ──
+  const bsModal = new bootstrap.Modal(modalEl);
+  bsModal.show();
 }
 
 // ---------------------------------------------------------------------------

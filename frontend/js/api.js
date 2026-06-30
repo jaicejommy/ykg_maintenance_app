@@ -152,6 +152,7 @@ async function getRecords(filters = {}) {
 
 /**
  * Create a new maintenance record (multipart/form-data).
+ * Files must be appended to formData as "attachments" (multiple allowed).
  * @param {FormData} formData
  * @returns {Promise<object>}
  */
@@ -170,6 +171,7 @@ async function createRecord(formData) {
 
 /**
  * Update an existing maintenance record (multipart/form-data).
+ * New files appended as "attachments" are ADDED to existing attachments.
  * @param {number} id
  * @param {FormData} formData
  * @returns {Promise<object>}
@@ -204,14 +206,37 @@ async function deleteRecord(id) {
   return response.json();
 }
 
+// ---------------------------------------------------------------------------
+// Attachments
+// ---------------------------------------------------------------------------
+
 /**
- * Trigger a file download for the attachment linked to a record.
- * Uses a temporary hidden <a> element with an object URL so the JWT header can be sent.
- * @param {number} id
- * @param {string} filename - Suggested download filename
+ * Fetch the list of attachments for a record.
+ * Returns an array of AttachmentOut objects (id, record_id, original_filename,
+ * file_size_bytes, uploaded_by, uploaded_date).
+ * @param {number} recordId
+ * @returns {Promise<Array>}
  */
-async function downloadAttachment(id, filename) {
-  const response = await fetch(`${API_BASE}/api/attachments/${id}`, {
+async function getRecordAttachments(recordId) {
+  const response = await fetch(`${API_BASE}/api/records/${recordId}/attachments`, {
+    method: "GET",
+    headers: buildAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    await throwResponseError(response);
+  }
+  return response.json();
+}
+
+/**
+ * Trigger a file download for a specific attachment by its attachment_id.
+ * Uses a temporary hidden <a> element with an object URL so the JWT header can be sent.
+ * @param {number} attachmentId  — record_attachments.id (NOT the record's id)
+ * @param {string} filename      — Suggested download filename
+ */
+async function downloadAttachment(attachmentId, filename) {
+  const response = await fetch(`${API_BASE}/api/attachments/${attachmentId}`, {
     method: "GET",
     headers: buildAuthHeaders(),
   });
@@ -225,7 +250,7 @@ async function downloadAttachment(id, filename) {
 
   const anchor = document.createElement("a");
   anchor.href = objectUrl;
-  anchor.download = filename || `attachment_${id}`;
+  anchor.download = filename || `attachment_${attachmentId}`;
   anchor.style.display = "none";
   document.body.appendChild(anchor);
   anchor.click();
@@ -235,6 +260,25 @@ async function downloadAttachment(id, filename) {
     URL.revokeObjectURL(objectUrl);
     document.body.removeChild(anchor);
   }, 100);
+}
+
+/**
+ * Delete a specific attachment by its attachment_id (Bug 2 fix).
+ * Calls DELETE /api/attachments/{attachmentId} — keyed by attachment_id,
+ * not by record_id. Engineers may only delete from records they created.
+ * @param {number} attachmentId  — record_attachments.id (NOT the record's id)
+ * @returns {Promise<object>}
+ */
+async function deleteAttachment(attachmentId) {
+  const response = await fetch(`${API_BASE}/api/attachments/${attachmentId}`, {
+    method: "DELETE",
+    headers: buildAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    await throwResponseError(response);
+  }
+  return response.json();
 }
 
 // ---------------------------------------------------------------------------
