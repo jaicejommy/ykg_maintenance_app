@@ -95,11 +95,14 @@ def _row_to_record_out(row) -> RecordOut:
     return RecordOut(
         id=row["id"],
         maintenance_type=row["maintenance_type"],
+        created_time=row["created_time"] or "",
+        equipment_id=row["equipment_id"],
         operating_conditions=row["operating_conditions"],
         inventory_consumables=row["inventory_consumables"],
-        equipment_id=row["equipment_id"],
-        date_time=row["date_time"],
         responsible_person=row["responsible_person"],
+        planned_start=row["planned_start"],
+        planned_end=row["planned_end"],
+        last_updated_time=row["last_updated_time"],
         remarks=row["remarks"],
         attachment_path=row["attachment_path"],
         attachment_original_name=row["attachment_original_name"],
@@ -142,6 +145,7 @@ async def list_records(
             params.extend([keyword, keyword, keyword])
 
         where_clause = " AND ".join(conditions)
+        # ORDER BY created_time DESC for chronological ordering of the domain field.
         query = f"SELECT * FROM maintenance_records WHERE {where_clause} ORDER BY id DESC"  # noqa: S608
         rows = fetch_all(query, tuple(params))
         return [_row_to_record_out(r) for r in rows]
@@ -164,22 +168,31 @@ async def list_records(
 async def create_record(
     maintenance_type: str = Form(...),
     equipment_id: str = Form(...),
-    date_time: str = Form(...),
     responsible_person: str = Form(...),
+    planned_start: Optional[str] = Form(None),
+    planned_end: Optional[str] = Form(None),
     operating_conditions: Optional[str] = Form(None),
     inventory_consumables: Optional[str] = Form(None),
     remarks: Optional[str] = Form(None),
     attachment: Optional[UploadFile] = File(None),
     current_user: dict = Depends(_engineer_or_admin),
 ) -> RecordOut:
-    """Create a new maintenance record. Accepts multipart/form-data."""
+    """Create a new maintenance record. Accepts multipart/form-data.
+
+    created_time is set server-side to the current UTC timestamp.
+    It is the maintenance-domain creation timestamp, conceptually distinct from
+    created_date (the audit-trail row-insertion timestamp). Both are set to the
+    same UTC moment at creation — they serve different conceptual roles.
+    """
     try:
-        # Validate text fields through Pydantic model
+        # Validate text fields through Pydantic model.
+        # planned_start and planned_end cross-field ordering is validated inside RecordCreate.
         validated = RecordCreate(
             maintenance_type=maintenance_type,
             equipment_id=equipment_id,
-            date_time=date_time,
             responsible_person=responsible_person,
+            planned_start=planned_start,
+            planned_end=planned_end,
             operating_conditions=operating_conditions,
             inventory_consumables=inventory_consumables,
             remarks=remarks,
@@ -192,30 +205,37 @@ async def create_record(
             _validate_attachment(attachment)
             attachment_path, attachment_original_name = _save_attachment(attachment)
 
-        now = _now_utc_str()
+        # Both created_time (domain field) and created_date (audit field) are set
+        # to the same UTC moment. They serve different conceptual roles even when
+        # numerically equal: created_time tracks the maintenance activity's log start;
+        # created_date tracks the database row insertion.
+        now_iso = _now_utc_str()
         username = current_user["sub"]
 
         new_id = execute(
             """
             INSERT INTO maintenance_records (
-                maintenance_type, operating_conditions, inventory_consumables,
-                equipment_id, date_time, responsible_person, remarks,
-                attachment_path, attachment_original_name,
+                maintenance_type, created_time, equipment_id,
+                operating_conditions, inventory_consumables,
+                responsible_person, planned_start, planned_end,
+                remarks, attachment_path, attachment_original_name,
                 created_by, created_date
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 validated.maintenance_type,
+                now_iso,
+                validated.equipment_id,
                 validated.operating_conditions,
                 validated.inventory_consumables,
-                validated.equipment_id,
-                validated.date_time,
                 validated.responsible_person,
+                validated.planned_start,
+                validated.planned_end,
                 validated.remarks,
                 attachment_path,
                 attachment_original_name,
                 username,
-                now,
+                now_iso,
             ),
         )
 
@@ -243,8 +263,9 @@ async def update_record(
     record_id: int,
     maintenance_type: Optional[str] = Form(None),
     equipment_id: Optional[str] = Form(None),
-    date_time: Optional[str] = Form(None),
     responsible_person: Optional[str] = Form(None),
+    planned_start: Optional[str] = Form(None),
+    planned_end: Optional[str] = Form(None),
     operating_conditions: Optional[str] = Form(None),
     inventory_consumables: Optional[str] = Form(None),
     remarks: Optional[str] = Form(None),
@@ -255,6 +276,8 @@ async def update_record(
 
     - Engineers may only update records they created (created_by == their username).
     - Administrators may update any record.
+    - last_updated_time is always system-assigned; never accepted from client input.
+    - created_time is never included in the UPDATE — it is immutable once set at creation.
     """
     try:
         role = current_user.get("role")
@@ -284,45 +307,64 @@ async def update_record(
                 detail="Engineers may only edit records they created.",
             )
 
-        # Validate updated text fields via Pydantic
+        # Validate updated text fields via Pydantic.
+        # planned_start/planned_end ordering is validated inside RecordUpdate.
         update_data = RecordUpdate(
             maintenance_type=maintenance_type,
             equipment_id=equipment_id,
-            date_time=date_time,
             responsible_person=responsible_person,
+            planned_start=planned_start,
+            planned_end=planned_end,
             operating_conditions=operating_conditions,
             inventory_consumables=inventory_consumables,
             remarks=remarks,
         )
 
-        fields: list[str] = []
-        params: list = []
+        now_iso = _now_utc_str()
 
-        # Apply only provided fields (non-None values)
-        update_map = update_data.model_dump(exclude_none=True)
-        for col, val in update_map.items():
-            fields.append(f"{col} = ?")
-            params.append(val)
+        # Build the full UPDATE statement with all domain fields explicitly listed.
+        # This ensures created_time is never touched and last_updated_time is always
+        # system-assigned — not derived from any client-submitted field.
+        execute(
+            """
+            UPDATE maintenance_records
+            SET maintenance_type = ?,
+                equipment_id = ?,
+                operating_conditions = ?,
+                inventory_consumables = ?,
+                responsible_person = ?,
+                planned_start = ?,
+                planned_end = ?,
+                remarks = ?,
+                last_updated_time = ?,
+                updated_by = ?,
+                updated_date = ?
+            WHERE id = ? AND deleted_date IS NULL
+            """,
+            (
+                update_data.maintenance_type if update_data.maintenance_type is not None else row["maintenance_type"],
+                update_data.equipment_id if update_data.equipment_id is not None else row["equipment_id"],
+                update_data.operating_conditions if update_data.operating_conditions is not None else row["operating_conditions"],
+                update_data.inventory_consumables if update_data.inventory_consumables is not None else row["inventory_consumables"],
+                update_data.responsible_person if update_data.responsible_person is not None else row["responsible_person"],
+                update_data.planned_start,
+                update_data.planned_end,
+                update_data.remarks,
+                now_iso,
+                username,
+                now_iso,
+                record_id,
+            ),
+        )
 
-        # Handle new attachment
+        # Handle new attachment separately (after main field update)
         if attachment and attachment.filename:
             _validate_attachment(attachment)
             att_path, att_name = _save_attachment(attachment)
-            fields.append("attachment_path = ?")
-            params.append(att_path)
-            fields.append("attachment_original_name = ?")
-            params.append(att_name)
-
-        fields.append("updated_by = ?")
-        params.append(username)
-        fields.append("updated_date = ?")
-        params.append(_now_utc_str())
-
-        params.append(record_id)
-        execute(
-            f"UPDATE maintenance_records SET {', '.join(fields)} WHERE id = ?",  # noqa: S608
-            tuple(params),
-        )
+            execute(
+                "UPDATE maintenance_records SET attachment_path = ?, attachment_original_name = ? WHERE id = ?",
+                (att_path, att_name, record_id),
+            )
 
         updated_row = fetch_one(
             "SELECT * FROM maintenance_records WHERE id = ?", (record_id,)
