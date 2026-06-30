@@ -123,21 +123,6 @@
               />
               <div id="field-equipment-id-error" class="field-error" role="alert"></div>
             </div>
-
-            <!-- Date / Time -->
-            <div class="col-md-4">
-              <label for="field-date-time" class="form-label">
-                Date / Time <span class="required-star" aria-hidden="true">*</span>
-              </label>
-              <input
-                type="datetime-local"
-                id="field-date-time"
-                name="date_time"
-                class="form-control"
-                required
-              />
-              <div id="field-date-time-error" class="field-error" role="alert"></div>
-            </div>
           </div>
         </div>
 
@@ -165,7 +150,38 @@
           </div>
         </div>
 
-        <!-- ── Section 3: Details ───────────────────────────────────────────── -->
+        <!-- ── Section 3: Schedule ──────────────────────────────────────────── -->
+        <div class="section-card">
+          <div class="section-card-title">Planned Schedule</div>
+
+          <div class="row g-3">
+            <!-- Planned Start -->
+            <div class="col-md-6">
+              <label for="field-planned-start" class="form-label">Planned Start</label>
+              <input
+                type="datetime-local"
+                id="field-planned-start"
+                name="planned_start"
+                class="form-control"
+              />
+              <div id="field-planned-start-error" class="field-error" role="alert"></div>
+            </div>
+
+            <!-- Planned End -->
+            <div class="col-md-6">
+              <label for="field-planned-end" class="form-label">Planned End</label>
+              <input
+                type="datetime-local"
+                id="field-planned-end"
+                name="planned_end"
+                class="form-control"
+              />
+              <div id="field-planned-end-error" class="field-error" role="alert"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Section 4: Details ───────────────────────────────────────────── -->
         <div class="section-card">
           <div class="section-card-title">Maintenance Details</div>
 
@@ -217,7 +233,7 @@
           </div>
         </div>
 
-        <!-- ── Section 4: Attachment ────────────────────────────────────────── -->
+        <!-- ── Section 5: Attachment ────────────────────────────────────────── -->
         <div class="section-card">
           <div class="section-card-title">Attachment</div>
 
