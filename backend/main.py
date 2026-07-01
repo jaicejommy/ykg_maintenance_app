@@ -17,6 +17,7 @@ load_dotenv()
 
 from backend.api import auth_routes  # noqa: E402
 from backend.api import csv_routes  # noqa: E402
+from backend.api import equipment_routes  # noqa: E402
 from backend.api import record_routes  # noqa: E402
 from backend.api import user_routes  # noqa: E402
 from backend.database import init_db, seed_default_admin  # noqa: E402
@@ -101,6 +102,7 @@ app.include_router(auth_routes.router)
 app.include_router(user_routes.router)
 app.include_router(record_routes.router)
 app.include_router(csv_routes.router)
+app.include_router(equipment_routes.router)
 
 
 # ---------------------------------------------------------------------------
