@@ -130,12 +130,36 @@
             </select>
           </div>
 
+          <!-- Category filter (static — FIC / ROS / KYC are fixed known values) -->
+          <div class="toolbar-filter">
+            <select class="form-select" id="categoryFilter" aria-label="Filter by equipment category">
+              <option value="">All Categories</option>
+              <option value="FIC">FIC</option>
+              <option value="ROS">ROS</option>
+              <option value="KYC">KYC</option>
+            </select>
+          </div>
+
+          <!-- Equipment ID text filter (client-side substring match) -->
+          <div class="toolbar-filter">
+            <input
+              type="text"
+              class="form-control"
+              id="equipmentFilter"
+              placeholder="Filter by equipment ID..."
+              autocomplete="off"
+              style="width: 200px;"
+              aria-label="Filter by equipment ID"
+            />
+          </div>
+
           <!-- New Record button (hidden for Viewers via JS) -->
           <a href="form.html" id="btn-new-record" class="btn btn-primary" role="button"
             aria-label="Create new maintenance record">
             + New Record
           </a>
         </div>
+
 
         <!-- Records table -->
         <div class="records-table-wrapper">

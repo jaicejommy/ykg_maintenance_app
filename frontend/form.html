@@ -107,22 +107,42 @@
               <div id="field-maintenance-type-error" class="field-error" role="alert"></div>
             </div>
 
-            <!-- Equipment ID -->
+            <!-- Equipment ID — searchable dropdown -->
             <div class="col-md-4">
-              <label for="field-equipment-id" class="form-label">
+              <label for="equipmentSearch" class="form-label">
                 Equipment ID <span class="required-star" aria-hidden="true">*</span>
               </label>
-              <input
-                type="text"
-                id="field-equipment-id"
-                name="equipment_id"
-                class="form-control"
-                placeholder="e.g. FIC-101"
-                required
-                maxlength="100"
-              />
-              <div id="field-equipment-id-error" class="field-error" role="alert"></div>
+              <div class="equipment-dropdown-wrapper" id="equipmentDropdownWrapper">
+                <!-- Visible search input the user types into -->
+                <input
+                  type="text"
+                  class="form-control"
+                  id="equipmentSearch"
+                  placeholder="Type to search equipment (e.g. KYC, FIC-102)..."
+                  autocomplete="off"
+                  aria-label="Search equipment"
+                  aria-expanded="false"
+                  aria-controls="equipmentDropdownList"
+                />
+                <!-- Hidden input that holds the actual selected value sent with the form -->
+                <input
+                  type="hidden"
+                  id="equipmentId"
+                  name="equipment_id"
+                />
+                <!-- Dropdown list — hidden by default, shown on focus/input -->
+                <ul
+                  class="equipment-dropdown-list"
+                  id="equipmentDropdownList"
+                  role="listbox"
+                  aria-label="Equipment options"
+                >
+                  <!-- Populated dynamically via ui.js — never innerHTML -->
+                </ul>
+              </div>
+              <div class="invalid-feedback" id="equipmentId-error"></div>
             </div>
+
           </div>
         </div>
 
