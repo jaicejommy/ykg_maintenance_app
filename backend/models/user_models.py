@@ -45,11 +45,18 @@ class UserCreate(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    """Payload schema for PUT /api/users/{id} — update role, status, or password."""
+    """Payload schema for PUT /api/users/{id} — update role, status, or password.
+
+    Both 'password' (legacy field) and 'new_password' are accepted for the
+    password field so that the Admin temporary-reset flow can use 'new_password'
+    while any existing callers using 'password' continue to work.
+    Only one should be provided per request; 'new_password' takes precedence.
+    """
 
     role: Optional[str] = None
     is_active: Optional[bool] = None
-    password: Optional[str] = None
+    password: Optional[str] = None        # legacy field — kept for backward compatibility
+    new_password: Optional[str] = None    # preferred field for admin temporary reset
 
     @field_validator("role")
     @classmethod

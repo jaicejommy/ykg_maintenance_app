@@ -89,9 +89,16 @@ async def update_user(
 ) -> UserOut:
     """Update a user's role, active status, or password. Administrators only.
 
-    Critical safeguard: an Administrator may not deactivate their own account.
-    This prevents an Administrator from accidentally locking themselves out.
-    The check is enforced server-side; the client-side UI hiding is not relied upon.
+    Critical safeguards:
+    - An Administrator may not deactivate their own account.
+    - new_password (preferred) or password (legacy) triggers a bcrypt hash update.
+    - The SET clause is built dynamically — omitting password fields does not
+      overwrite the stored hash with NULL.
+    - The response schema (UserOut) never includes hashed_password.
+
+    Password field precedence: new_password takes priority over password if both
+    are provided. This supports the frontend Admin temporary-reset flow which
+    sends { new_password: "..." }.
     """
     try:
         row = fetch_one("SELECT * FROM users WHERE id = ?", (user_id,))
@@ -121,9 +128,17 @@ async def update_user(
             fields.append("is_active = ?")
             params.append(1 if payload.is_active else 0)
 
-        if payload.password is not None and payload.password:
+        # new_password takes precedence over legacy password field.
+        # Only one should be sent per request in practice.
+        raw_new_password = payload.new_password or payload.password
+        if raw_new_password:
+            if len(raw_new_password) < 8:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="New password must be at least 8 characters.",
+                )
             fields.append("hashed_password = ?")
-            params.append(hash_password(payload.password))
+            params.append(hash_password(raw_new_password))
 
         if not fields:
             raise HTTPException(
