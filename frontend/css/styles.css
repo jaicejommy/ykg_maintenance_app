@@ -829,14 +829,14 @@ textarea.form-control {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  padding: 0.6rem 0.85rem;
+  padding: 0.45rem 0.6rem;  /* reduced from 0.6rem 0.85rem — Change 2 overflow fix */
   border: none;
   white-space: nowrap;
 }
 
 .table tbody td,
 .records-table td {
-  padding: 0.6rem 0.85rem;
+  padding: 0.45rem 0.6rem;  /* reduced from 0.6rem 0.85rem — Change 2 overflow fix */
   border-bottom: 1px solid var(--color-border);
   vertical-align: middle;
   color: var(--color-text-primary);

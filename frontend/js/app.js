@@ -93,6 +93,8 @@ function applyNavbarRoleVisibility() {
 /**
  * Populate the sidebar user info fields and wire the logout button.
  * Uses textContent only — no innerHTML.
+ * Also calls initChangePasswordModal() to wire the avatar click handler
+ * on every protected page.
  */
 function populateSidebar() {
   const username = getUsername();
@@ -120,6 +122,9 @@ function populateSidebar() {
       window.location.href = "index.html";
     });
   }
+
+  // Wire the avatar → change-password modal on every protected page
+  initChangePasswordModal();
 }
 
 /**
@@ -132,6 +137,123 @@ function populateTopbarMeta() {
   if (metaEl && username) {
     metaEl.textContent = username + " \u2014 " + (role || "");
   }
+}
+
+// ---------------------------------------------------------------------------
+// CHANGE PASSWORD MODAL (self-service — all authenticated roles)
+// ---------------------------------------------------------------------------
+
+/**
+ * Wire the change-password modal on every protected page.
+ * Called from populateSidebar() so it runs once per page load.
+ *
+ * Flow:
+ *   1. #sidebarUserAvatar click → open modal, clear all fields and errors.
+ *   2. #changePasswordSubmitBtn click → client-side validate all fields
+ *      simultaneously, then call api.changePassword() only if all pass.
+ *   3. On success: close modal, clear fields, show success toast.
+ *   4. On failure: show server detail toast, keep modal open.
+ *   5. hidden.bs.modal event → clear all field values and error states.
+ *
+ * Password values are only ever assigned via .value property on input elements
+ * (never innerHTML). All error messages are set via showFieldError() which uses
+ * textContent internally.
+ */
+function initChangePasswordModal() {
+  const modalEl   = document.getElementById("changePasswordModal");
+  const avatarEl  = document.getElementById("sidebarUserAvatar");
+  const submitBtn = document.getElementById("changePasswordSubmitBtn");
+
+  // Guard: modal must be present on the page (all protected pages have it)
+  if (!modalEl) return;
+
+  // ── Helper: clear all fields and error states in the modal ──
+  function clearModalFields() {
+    const fields = ["currentPassword", "newPassword", "confirmNewPassword"];
+    fields.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.value = "";
+      // Clear is-invalid on the input
+      if (el) el.classList.remove("is-invalid");
+      // Clear the error span
+      const errEl = document.getElementById(id + "-error");
+      if (errEl) {
+        errEl.textContent = "";
+        errEl.classList.remove("visible");
+      }
+    });
+  }
+
+  // ── 1. Avatar click: open modal and clear stale values ──
+  if (avatarEl) {
+    avatarEl.addEventListener("click", () => {
+      clearModalFields();
+      const bsModal = new bootstrap.Modal(modalEl);
+      bsModal.show();
+    });
+  }
+
+  // ── 3. hidden.bs.modal: always clear fields when modal is dismissed ──
+  modalEl.addEventListener("hidden.bs.modal", () => {
+    clearModalFields();
+  });
+
+  // ── 2. Submit button click ──
+  if (!submitBtn) return;
+
+  submitBtn.addEventListener("click", async () => {
+    // Read current values via .value — never innerHTML
+    const currentPwEl  = document.getElementById("currentPassword");
+    const newPwEl      = document.getElementById("newPassword");
+    const confirmPwEl  = document.getElementById("confirmNewPassword");
+
+    const currentPassword  = currentPwEl  ? currentPwEl.value  : "";
+    const newPassword      = newPwEl      ? newPwEl.value      : "";
+    const confirmNewPw     = confirmPwEl  ? confirmPwEl.value  : "";
+
+    // Clear previous error states before re-validating
+    ["currentPassword", "newPassword", "confirmNewPassword"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove("is-invalid");
+      const errEl = document.getElementById(id + "-error");
+      if (errEl) { errEl.textContent = ""; errEl.classList.remove("visible"); }
+    });
+
+    // ── Client-side validation — collect all errors simultaneously ──
+    const validations = [
+      { fieldId: "currentPassword",   result: validateRequired(currentPassword, "Current Password") },
+      { fieldId: "newPassword",        result: validateRequired(newPassword, "New Password") },
+      { fieldId: "newPassword",        result: validatePassword(newPassword) },
+      { fieldId: "confirmNewPassword", result: validateConfirmPassword(newPassword, confirmNewPw) },
+    ];
+
+    let hasErrors = false;
+    validations.forEach(({ fieldId, result }) => {
+      if (!result.valid) {
+        showFieldError(fieldId, result.message);
+        hasErrors = true;
+      }
+    });
+
+    if (hasErrors) return;
+
+    // ── API call ──
+    setLoading(submitBtn, true);
+    try {
+      await changePassword(currentPassword, newPassword, confirmNewPw);
+
+      // Success: close modal, clear fields, show toast
+      const bsModal = bootstrap.Modal.getInstance(modalEl);
+      if (bsModal) bsModal.hide();
+      clearModalFields();
+      showToast("Password changed successfully.", "success");
+    } catch (err) {
+      // Failure: show server detail, keep modal open so user can correct input
+      showToast(err.message || "Failed to change password.", "error");
+    } finally {
+      setLoading(submitBtn, false);
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -798,8 +920,8 @@ async function initManageUsersPage() {
   async function loadUsers() {
     try {
       const users = await getUsers();
-      // Pass the current username and the toggle callback to renderUsersTable (ui.js)
-      renderUsersTable(users, currentUser, handleToggleClick);
+      // Pass the current username, toggle callback, and reset-password callback
+      renderUsersTable(users, currentUser, handleToggleClick, handleResetPasswordClick);
     } catch (err) {
       showToast(err.message || "Failed to load users.", "error");
     }
@@ -839,8 +961,22 @@ async function initManageUsersPage() {
     });
   }
 
+  /**
+   * Callback passed to renderUsersTable as onResetPasswordClick.
+   * Delegates to the modal opener registered by initResetPasswordModal().
+   * @param {object} user - The user object from the users list
+   */
+  function handleResetPasswordClick(user) {
+    if (typeof window._openResetPasswordModal === "function") {
+      window._openResetPasswordModal(user);
+    }
+  }
+
   // Initial load
   loadUsers();
+
+  // Wire the Reset Password modal (Admin temporary password reset)
+  initResetPasswordModal(loadUsers);
 
   // ── Change 3.1 — Create User form: intercept submit for double-confirmation ──
   form.addEventListener("submit", async (e) => {
@@ -902,6 +1038,132 @@ async function initManageUsersPage() {
         }
       },
     });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// ADMIN RESET PASSWORD MODAL (manage-users.html only)
+// ---------------------------------------------------------------------------
+
+/**
+ * Wire the Reset Password modal on manage-users.html.
+ * Called from initManageUsersPage() after initial loadUsers().
+ *
+ * @param {function} reloadUsers - Async callback to refresh the users table after
+ *                                 a successful password reset (passed in from
+ *                                 initManageUsersPage to avoid a circular dependency).
+ *
+ * Security notes:
+ *  - The target userId is stored in a function-scoped local variable — never in a
+ *    global variable and never in a DOM data attribute read back at submit time.
+ *  - Validation (validatePassword + validateConfirmPassword) runs before every API call.
+ *  - api.updateUser(userId, { new_password }) sends to PUT /api/users/{id} which is
+ *    restricted to require_role(ROLES["ADMIN"]) server-side.
+ *  - The success toast uses a captured username string — never innerHTML.
+ */
+function initResetPasswordModal(reloadUsers) {
+  const modalEl   = document.getElementById("resetPasswordModal");
+  const submitBtn = document.getElementById("resetPasswordSubmitBtn");
+
+  if (!modalEl || !submitBtn) return;
+
+  // userId is scoped here — set when a Reset Password button is clicked,
+  // read only inside the submit handler of the same closure.
+  let _targetUserId   = null;
+  let _targetUsername = "";
+
+  // ── Helper: clear fields and error states ──
+  function clearResetFields() {
+    ["tempPassword", "confirmTempPassword"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.value = "";
+      if (el) el.classList.remove("is-invalid");
+      const errEl = document.getElementById(id + "-error");
+      if (errEl) { errEl.textContent = ""; errEl.classList.remove("visible"); }
+    });
+  }
+
+  // ── Expose an opener function that per-row Reset Password buttons call ──
+  // This is the callback passed as onResetPasswordClick in renderUsersTable().
+  // It is stored on the function object so renderUsersTable can invoke it.
+  // The actual wiring of per-row buttons happens inside renderUsersTable (ui.js);
+  // initManageUsersPage passes handleResetPasswordClick as the 4th argument.
+  window._openResetPasswordModal = function(user) {
+    _targetUserId   = user.id;
+    _targetUsername = user.username;
+
+    // Populate the username display — textContent only, never innerHTML
+    const usernameEl = document.getElementById("resetPasswordUsername");
+    if (usernameEl) usernameEl.textContent = _targetUsername;
+
+    clearResetFields();
+    const bsModal = new bootstrap.Modal(modalEl);
+    bsModal.show();
+  };
+
+  // ── Clear fields when modal is dismissed ──
+  modalEl.addEventListener("hidden.bs.modal", () => {
+    clearResetFields();
+    _targetUserId   = null;
+    _targetUsername = "";
+  });
+
+  // ── Submit: validate → API call ──
+  submitBtn.addEventListener("click", async () => {
+    const tempPwEl    = document.getElementById("tempPassword");
+    const confirmPwEl = document.getElementById("confirmTempPassword");
+
+    const tempPassword    = tempPwEl    ? tempPwEl.value    : "";
+    const confirmPassword = confirmPwEl ? confirmPwEl.value : "";
+
+    // Clear previous error states
+    ["tempPassword", "confirmTempPassword"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove("is-invalid");
+      const errEl = document.getElementById(id + "-error");
+      if (errEl) { errEl.textContent = ""; errEl.classList.remove("visible"); }
+    });
+
+    // ── Validate simultaneously ──
+    const validations = [
+      { fieldId: "tempPassword",         result: validatePassword(tempPassword) },
+      { fieldId: "confirmTempPassword",  result: validateConfirmPassword(tempPassword, confirmPassword) },
+    ];
+
+    let hasErrors = false;
+    validations.forEach(({ fieldId, result }) => {
+      if (!result.valid) {
+        showFieldError(fieldId, result.message);
+        hasErrors = true;
+      }
+    });
+
+    if (hasErrors) return;
+    if (!_targetUserId) return; // Guard: should never happen in normal flow
+
+    // Capture username for the toast — reading from the variable, not the DOM
+    const capturedUsername = _targetUsername;
+    const capturedUserId   = _targetUserId;
+
+    setLoading(submitBtn, true);
+    try {
+      await updateUser(capturedUserId, { new_password: tempPassword });
+
+      // Success: close modal, clear fields, refresh table, show toast
+      const bsModal = bootstrap.Modal.getInstance(modalEl);
+      if (bsModal) bsModal.hide();
+      clearResetFields();
+
+      // Toast message — capturedUsername is a plain string variable, never innerHTML
+      showToast(`Temporary password set for ${capturedUsername}.`, "success");
+
+      if (reloadUsers) await reloadUsers();
+    } catch (err) {
+      // Failure: show server detail, keep modal open
+      showToast(err.message || "Failed to set temporary password.", "error");
+    } finally {
+      setLoading(submitBtn, false);
+    }
   });
 }
 

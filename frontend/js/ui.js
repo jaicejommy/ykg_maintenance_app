@@ -271,43 +271,6 @@ function renderRecordsTable(records, userRole, username) {
     createdByTd.textContent = record.created_by || "\u2014";
     row.appendChild(createdByTd);
 
-    // Actions cell
-    const canEdit   = isAdmin || (isEngineer && record.created_by === username);
-    const canDelete = isAdmin;
-
-    const actionsTd = document.createElement("td");
-    if (canEdit || canDelete) {
-      const actionsDiv = document.createElement("div");
-      actionsDiv.className = "actions-cell d-flex gap-1";
-
-      if (canEdit) {
-        const editLink = document.createElement("a");
-        editLink.setAttribute("href", `form.html?id=${record.id}`);
-        editLink.className = "btn-action btn-action-edit";
-        editLink.textContent = "Edit";
-        actionsDiv.appendChild(editLink);
-      }
-
-      if (canDelete) {
-        const deleteBtn = document.createElement("button");
-        deleteBtn.className = "btn-action btn-action-delete";
-        deleteBtn.textContent = "Delete";
-        deleteBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          handleDeleteClick(record.id, deleteBtn);
-        });
-        actionsDiv.appendChild(deleteBtn);
-      }
-
-      actionsTd.appendChild(actionsDiv);
-    } else {
-      const dash = document.createElement("span");
-      dash.className = "text-muted-custom";
-      dash.textContent = "\u2014";
-      actionsTd.appendChild(dash);
-    }
-    row.appendChild(actionsTd);
-
     tbody.appendChild(row);
   });
 }
@@ -444,15 +407,16 @@ function showRecordDetail(record, userRole, username) {
  * Build and inject table rows for the existing users table on manage-users.html.
  * Uses createElement and textContent exclusively — never innerHTML with user data.
  *
- * The row for the currently logged-in Administrator has its Action button replaced
+ * The row for the currently logged-in Administrator has its Action buttons replaced
  * with "(Your Account)" and disabled — this is the client-side mirror of the backend
  * safeguard; the server-side check is the actual security boundary.
  *
  * @param {Array<object>} users - Array of user objects from GET /api/users
  * @param {string} currentUsername - Username of the currently logged-in Administrator
- * @param {function} onToggleClick - Callback(user) invoked when a toggle button is clicked
+ * @param {function} onToggleClick - Callback(user) invoked when Activate/Deactivate is clicked
+ * @param {function} onResetPasswordClick - Callback(user) invoked when Reset Password is clicked
  */
-function renderUsersTable(users, currentUsername, onToggleClick) {
+function renderUsersTable(users, currentUsername, onToggleClick, onResetPasswordClick) {
   const tbody = document.getElementById("users-tbody");
   const emptyState = document.getElementById("users-empty-state");
 
@@ -498,7 +462,7 @@ function renderUsersTable(users, currentUsername, onToggleClick) {
     statusTd.appendChild(statusBadge);
     row.appendChild(statusTd);
 
-    // Action column
+    // Actions column
     const actionTd = document.createElement("td");
     const isOwnAccount = (user.username === currentUsername);
 
@@ -510,15 +474,29 @@ function renderUsersTable(users, currentUsername, onToggleClick) {
       ownLabel.textContent = "(Your Account)";
       actionTd.appendChild(ownLabel);
     } else {
+      const actionsDiv = document.createElement("div");
+      actionsDiv.className = "d-flex gap-1";
+
+      // Activate / Deactivate toggle button
       const toggleBtn = document.createElement("button");
-      toggleBtn.className = user.is_active
-        ? "btn btn-sm btn-outline-secondary"
-        : "btn btn-sm btn-outline-secondary";
+      toggleBtn.className = "btn btn-sm btn-outline-secondary";
       toggleBtn.textContent = user.is_active ? "Deactivate" : "Activate";
       toggleBtn.addEventListener("click", () => {
         if (onToggleClick) onToggleClick(user);
       });
-      actionTd.appendChild(toggleBtn);
+      actionsDiv.appendChild(toggleBtn);
+
+      // Reset Password button — hidden for own account (handled above),
+      // visible for all other users
+      const resetBtn = document.createElement("button");
+      resetBtn.className = "btn btn-sm btn-outline-secondary";
+      resetBtn.textContent = "Reset Password";
+      resetBtn.addEventListener("click", () => {
+        if (onResetPasswordClick) onResetPasswordClick(user);
+      });
+      actionsDiv.appendChild(resetBtn);
+
+      actionTd.appendChild(actionsDiv);
     }
 
     row.appendChild(actionTd);

@@ -62,6 +62,38 @@ async function login(username, password) {
 }
 
 // ---------------------------------------------------------------------------
+// Auth (continued)
+// ---------------------------------------------------------------------------
+
+/**
+ * Change the currently authenticated user's own password.
+ * Identity is derived from the JWT only — no user_id is sent.
+ * @param {string} currentPassword
+ * @param {string} newPassword
+ * @param {string} confirmNewPassword
+ * @returns {Promise<{detail: string}>}
+ */
+async function changePassword(currentPassword, newPassword, confirmNewPassword) {
+  const response = await fetch(`${API_BASE}/api/auth/change-password`, {
+    method: "PUT",
+    headers: {
+      ...buildAuthHeaders(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      current_password:     currentPassword,
+      new_password:         newPassword,
+      confirm_new_password: confirmNewPassword,
+    }),
+  });
+
+  if (!response.ok) {
+    await throwResponseError(response);
+  }
+  return response.json();
+}
+
+// ---------------------------------------------------------------------------
 // Users
 // ---------------------------------------------------------------------------
 
