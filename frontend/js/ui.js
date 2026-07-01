@@ -354,7 +354,8 @@ function populateForm(record) {
   };
 
   setValue("field-maintenance-type", record.maintenance_type);
-  setValue("field-equipment-id",     record.equipment_id);
+  // equipment_id is pre-populated via setEquipmentDropdownValue() in app.js
+  // (the old free-text #field-equipment-id has been replaced by a searchable dropdown)
   setValue("field-responsible-person", record.responsible_person);
   setValue("field-operating-conditions", record.operating_conditions);
   setValue("field-inventory-consumables", record.inventory_consumables);
@@ -724,3 +725,129 @@ function renderCsvGrid(headers, rows, isEditable) {
   table.appendChild(tbody);
   return table;
 }
+
+// ---------------------------------------------------------------------------
+// Equipment searchable dropdown
+// ---------------------------------------------------------------------------
+
+/**
+ * Filter the equipment array and re-render the dropdown list.
+ *
+ * @param {Array<object>} equipment  - Full equipment array from the API
+ * @param {string}        searchTerm - Current text in the visible search input
+ * @param {HTMLElement}   listEl     - The <ul> dropdown list element
+ * @param {HTMLInputElement} hiddenEl - The hidden input that holds the selected code
+ * @param {HTMLInputElement} inputEl  - The visible search input
+ */
+function filterAndRenderEquipmentList(equipment, searchTerm, listEl, hiddenEl, inputEl) {
+  // Clear list safely
+  listEl.textContent = "";
+
+  if (!searchTerm) {
+    // Empty search — close list and clear the hidden value (selection is ambiguous)
+    listEl.classList.remove("open");
+    hiddenEl.value = "";
+    inputEl.setAttribute("aria-expanded", "false");
+    return;
+  }
+
+  const lower = searchTerm.toLowerCase();
+  const matches = equipment.filter((item) =>
+    item.code.toLowerCase().includes(lower)
+  );
+
+  if (matches.length === 0) {
+    const li = document.createElement("li");
+    li.className = "equipment-dropdown-empty";
+    li.textContent = "No equipment found.";
+    listEl.appendChild(li);
+  } else {
+    matches.forEach((item) => {
+      const li = document.createElement("li");
+      li.textContent = item.code;
+      li.setAttribute("role", "option");
+      li.setAttribute("tabindex", "-1"); // required: makes li focusable so e.relatedTarget in focusout points here, not null
+
+      // Mark as selected if this code is already chosen
+      if (hiddenEl.value === item.code) {
+        li.classList.add("selected");
+      }
+
+      li.addEventListener("click", () => {
+        hiddenEl.value = item.code;
+        inputEl.value  = item.code;
+        listEl.classList.remove("open");
+        inputEl.setAttribute("aria-expanded", "false");
+        // Clear any existing validation error on the equipment field
+        clearFieldErrors();
+      });
+
+      listEl.appendChild(li);
+    });
+  }
+
+  listEl.classList.add("open");
+  inputEl.setAttribute("aria-expanded", "true");
+}
+
+/**
+ * Initialise all event listeners for the searchable equipment dropdown.
+ *
+ * @param {Array<object>}   equipment - Full equipment array from the API
+ * @param {HTMLInputElement} inputEl  - The visible search input (#equipmentSearch)
+ * @param {HTMLElement}      listEl   - The <ul> dropdown list (#equipmentDropdownList)
+ * @param {HTMLInputElement} hiddenEl - The hidden value input (#equipmentId)
+ */
+function buildEquipmentDropdown(equipment, inputEl, listEl, hiddenEl) {
+  if (!inputEl || !listEl || !hiddenEl) return;
+
+  // Re-filter and re-render on every keystroke in the search box
+  inputEl.addEventListener("input", () => {
+    filterAndRenderEquipmentList(equipment, inputEl.value, listEl, hiddenEl, inputEl);
+  });
+
+  // Show the list when the input is focused (if there is already a search term)
+  inputEl.addEventListener("focus", () => {
+    if (inputEl.value) {
+      filterAndRenderEquipmentList(equipment, inputEl.value, listEl, hiddenEl, inputEl);
+    }
+  });
+
+  // Close the dropdown when focus leaves the wrapper entirely.
+  // relatedTarget check prevents premature close when clicking a list item
+  // (the click event fires before the blur, so relatedTarget is the <li>).
+  const wrapper = inputEl.closest(".equipment-dropdown-wrapper");
+  if (wrapper) {
+    wrapper.addEventListener("focusout", (e) => {
+      if (!wrapper.contains(e.relatedTarget)) {
+        listEl.classList.remove("open");
+        inputEl.setAttribute("aria-expanded", "false");
+      }
+    });
+  }
+}
+
+/**
+ * Pre-populate the searchable equipment dropdown in edit mode.
+ * Handles deactivated / unrecognised codes gracefully — displays the raw stored
+ * value so the edit form never blanks out a previously saved equipment_id.
+ *
+ * @param {Array<object>}   equipment - Full equipment array from the API
+ * @param {string}          code      - The equipment_id stored on the record
+ * @param {HTMLInputElement} inputEl  - The visible search input (#equipmentSearch)
+ * @param {HTMLInputElement} hiddenEl - The hidden value input (#equipmentId)
+ */
+function setEquipmentDropdownValue(equipment, code, inputEl, hiddenEl) {
+  if (!code) return;
+
+  // Find the matching item — may be absent if the equipment was deactivated
+  const found = equipment.find((item) => item.code === code);
+
+  // Whether found or not, display and preserve the stored code value
+  if (inputEl)  inputEl.value  = code;
+  if (hiddenEl) hiddenEl.value = code;
+
+  // Suppress unused-variable lint — found is used only as a guard
+  void found;
+}
+

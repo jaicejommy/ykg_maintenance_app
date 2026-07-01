@@ -1637,6 +1637,71 @@ textarea.form-control {
   }
 }
 
+/* ============================================================
+   EQUIPMENT SEARCHABLE DROPDOWN
+   ============================================================ */
+
+.equipment-dropdown-wrapper {
+  position: relative;
+}
+
+.equipment-dropdown-list {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-top: none;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  max-height: 220px;
+  overflow-y: auto;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  box-shadow: var(--shadow-panel);
+}
+
+.equipment-dropdown-list.open {
+  display: block;
+}
+
+.equipment-dropdown-list li {
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.equipment-dropdown-list li:last-child {
+  border-bottom: none;
+}
+
+.equipment-dropdown-list li:hover {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.equipment-dropdown-list li.selected {
+  background: var(--color-accent-subtle);
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+.equipment-dropdown-empty {
+  color: var(--color-text-muted);
+  font-style: italic;
+  cursor: default;
+}
+
+.equipment-dropdown-empty:hover {
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
 @media (max-width: 768px) {
   .page-content {
     padding: var(--space-lg);

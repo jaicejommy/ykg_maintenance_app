@@ -383,3 +383,28 @@ async function downloadCsv(recordId) {
   URL.revokeObjectURL(objectUrl);
   document.body.removeChild(anchor);
 }
+
+// ---------------------------------------------------------------------------
+// Equipment
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch the active equipment list from the master table.
+ * @param {{ category?: string, active_only?: boolean }} params
+ * @returns {Promise<Array>}
+ */
+async function getEquipment(params = {}) {
+  const query = Object.keys(params).length
+    ? "?" + new URLSearchParams(params).toString()
+    : "";
+  const response = await fetch(`${API_BASE}/api/equipment${query}`, {
+    method: "GET",
+    headers: buildAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    await throwResponseError(response);
+  }
+  return response.json();
+}
+

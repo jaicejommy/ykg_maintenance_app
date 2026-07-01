@@ -145,6 +145,27 @@ let pendingDeleteRow  = null;
 let _recordsMap = {};
 
 /**
+ * Pure filter function — applies three simultaneous filters to the in-memory
+ * records array. Extracts the logic into one place so all three filter event
+ * listeners share identical behaviour without duplication.
+ *
+ * @param {Array<object>} records - The full unfiltered records array
+ * @param {{ type: string, category: string, equipment: string }} filters
+ * @returns {Array<object>} Filtered records
+ */
+function applyDashboardFilters(records, filters) {
+  return records.filter((record) => {
+    const typeMatch = !filters.type ||
+      record.maintenance_type === filters.type;
+    const categoryMatch = !filters.category ||
+      record.equipment_id.startsWith(filters.category);
+    const equipmentMatch = !filters.equipment ||
+      record.equipment_id.toLowerCase().includes(filters.equipment.toLowerCase());
+    return typeMatch && categoryMatch && equipmentMatch;
+  });
+}
+
+/**
  * Initialize the dashboard page.
  * Detects page by checking for #records-tbody.
  */
@@ -170,32 +191,53 @@ function initDashboardPage() {
     newRecordBtn.style.display = "none";
   }
 
-  const searchInput  = document.getElementById("search-input");
-  const typeFilter   = document.getElementById("type-filter");
+  const searchInput    = document.getElementById("search-input");
+  const typeFilter     = document.getElementById("type-filter");
+  const categoryFilter = document.getElementById("categoryFilter");
+  const equipmentFilter = document.getElementById("equipmentFilter");
 
-  // Load records function with current filter state
+  // Full unfiltered records — loaded once on page load, filtered in memory
+  let allRecords = [];
+
+  /**
+   * Re-apply all three dashboard filters to the in-memory allRecords array
+   * and re-render the table. No API call is made here.
+   */
+  function applyFilters() {
+    const currentFilters = {
+      type:      typeFilter      ? typeFilter.value      : "",
+      category:  categoryFilter  ? categoryFilter.value  : "",
+      equipment: equipmentFilter ? equipmentFilter.value : "",
+    };
+    const filtered = applyDashboardFilters(allRecords, currentFilters);
+    renderRecordsTable(filtered, role, username);
+    attachRowClickListeners(role, username);
+  }
+
+  // Load records function — fetches from API, stores in allRecords, applies filters
   async function loadRecords() {
-    const filters = {
-      type:   typeFilter  ? typeFilter.value  : "",
+    // Pass search text to the server so the API's own search still works;
+    // category / equipment are filtered client-side from the returned set.
+    const serverFilters = {
       search: searchInput ? searchInput.value : "",
     };
     try {
-      const records = await getRecords(filters);
+      const records = await getRecords(serverFilters);
+
+      // Store the full result set for client-side filter operations
+      allRecords = records;
 
       // Keep a local map for the row-click handler
       _recordsMap = {};
       records.forEach((r) => { _recordsMap[r.id] = r; });
 
-      renderRecordsTable(records, role, username);
-
-      // Attach row-click listeners after the table is rendered
-      attachRowClickListeners(role, username);
+      applyFilters();
     } catch (err) {
       showToast(err.message || "Failed to load records.", "error");
     }
   }
 
-  // Wire search and filter controls
+  // Wire search — re-fetches from the API (server-side text search)
   if (searchInput) {
     let debounceTimer;
     searchInput.addEventListener("input", () => {
@@ -204,8 +246,23 @@ function initDashboardPage() {
     });
   }
 
+  // Wire type filter — client-side, no API call
   if (typeFilter) {
-    typeFilter.addEventListener("change", loadRecords);
+    typeFilter.addEventListener("change", applyFilters);
+  }
+
+  // Wire category filter — client-side, no API call
+  if (categoryFilter) {
+    categoryFilter.addEventListener("change", applyFilters);
+  }
+
+  // Wire equipment ID filter — client-side, no API call
+  if (equipmentFilter) {
+    let equipDebounce;
+    equipmentFilter.addEventListener("input", () => {
+      clearTimeout(equipDebounce);
+      equipDebounce = setTimeout(applyFilters, 200);
+    });
   }
 
   // Logout
@@ -498,6 +555,20 @@ async function initFormPage() {
     });
   }
 
+  // DOM references for the searchable equipment dropdown
+  const equipmentSearchEl = document.getElementById("equipmentSearch");
+  const equipmentIdEl     = document.getElementById("equipmentId");
+  const equipmentListEl   = document.getElementById("equipmentDropdownList");
+
+  // Fetch the active equipment list and initialise the dropdown
+  let equipmentList = [];
+  try {
+    equipmentList = await getEquipment();
+  } catch (err) {
+    showToast(err.message || "Failed to load equipment list.", "error");
+  }
+  buildEquipmentDropdown(equipmentList, equipmentSearchEl, equipmentListEl, equipmentIdEl);
+
   // For edit mode, load and pre-populate the form then fetch existing attachments
   let editRecord = null;
   if (isEdit) {
@@ -506,6 +577,8 @@ async function initFormPage() {
       editRecord = records.find((r) => r.id === editId) || null;
       if (editRecord) {
         populateForm(editRecord);
+        // Pre-populate the searchable equipment dropdown with the stored value
+        setEquipmentDropdownValue(equipmentList, editRecord.equipment_id, equipmentSearchEl, equipmentIdEl);
         // Render existing attachments list (replaces old single-attachment block)
         await renderExistingAttachments(editId);
       } else {
@@ -588,7 +661,8 @@ async function initFormPage() {
     clearFieldErrors();
 
     const maintenanceType      = document.getElementById("field-maintenance-type")?.value;
-    const equipmentId          = document.getElementById("field-equipment-id")?.value ?? "";
+    // Read the hidden input value — set only when the user explicitly clicks a list item
+    const equipmentId          = document.getElementById("equipmentId")?.value ?? "";
     const responsiblePerson    = document.getElementById("field-responsible-person")?.value ?? "";
     const plannedStart         = document.getElementById("field-planned-start")?.value ?? "";
     const plannedEnd           = document.getElementById("field-planned-end")?.value ?? "";
@@ -597,9 +671,14 @@ async function initFormPage() {
     const remarks              = document.getElementById("field-remarks")?.value ?? "";
     // Run all per-field validators and collect errors
     const validations = [
-      { fieldId: "field-maintenance-type",      result: validateMaintenanceType(maintenanceType) },
-      { fieldId: "field-equipment-id",          result: validateRequired(equipmentId, "Equipment ID") },
-      { fieldId: "field-equipment-id",          result: validateMaxLength(equipmentId, MAX_EQUIPMENT_ID_LENGTH, "Equipment ID") },
+      { fieldId: "field-maintenance-type", result: validateMaintenanceType(maintenanceType) },
+      // Equipment: validate the hidden input — typing without selecting must fail
+      {
+        fieldId: "equipmentId",
+        result: equipmentId
+          ? { valid: true, message: "" }
+          : { valid: false, message: "Please select an equipment ID from the list." },
+      },
       { fieldId: "field-responsible-person",    result: validateRequired(responsiblePerson, "Responsible Person") },
       { fieldId: "field-responsible-person",    result: validateMaxLength(responsiblePerson, MAX_RESPONSIBLE_PERSON_LENGTH, "Responsible Person") },
       { fieldId: "field-planned-start",         result: validateDatetimeOptional(plannedStart, "Planned Start") },
@@ -624,6 +703,12 @@ async function initFormPage() {
         hasErrors = true;
       }
     });
+
+    // Mirror is-invalid onto the visible search input when the hidden equipment field fails.
+    // showFieldError targets the hidden #equipmentId; the user needs to see the border on #equipmentSearch.
+    if (equipmentSearchEl && document.getElementById("equipmentId")?.classList.contains("is-invalid")) {
+      equipmentSearchEl.classList.add("is-invalid");
+    }
 
     // Cross-field: planned_end must not precede planned_start
     const windowResult = validatePlannedWindow(plannedStart, plannedEnd);
