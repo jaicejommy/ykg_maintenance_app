@@ -284,6 +284,8 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
+        <!-- Dummy username to prevent browser password managers from hijacking preceding text fields -->
+        <input type="text" name="dummy_username" autocomplete="username" style="position: absolute; opacity: 0; height: 0; width: 0; z-index: -1;" aria-hidden="true">
         <div class="mb-3">
           <label class="form-label" for="currentPassword">Current Password</label>
           <input type="password" class="form-control" id="currentPassword" autocomplete="current-password">
