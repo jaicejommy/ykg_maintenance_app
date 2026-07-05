@@ -1703,25 +1703,277 @@ textarea.form-control {
 }
 
 @media (max-width: 768px) {
-  .page-content {
-    padding: var(--space-lg);
+
+  /* Fix 1 — Sidebar becomes horizontal top navbar */
+  .sidebar {
+    width: 100% !important;
+    height: 48px;
+    min-height: unset;
+    flex-direction: row;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: unset;
+    border-right: none;
+    border-bottom: 1px solid var(--color-sidebar-border);
+    overflow: hidden;
+    z-index: 100;
+  }
+
+  .sidebar-brand {
+    padding: 0 var(--space-md) !important;
+    min-height: unset;
+    flex-shrink: 0;
+    border-right: 1px solid var(--color-sidebar-border);
+    height: 100%;
+    display: flex !important;
+    align-items: center;
+  }
+
+  .sidebar-brand-label {
+    display: none !important;
+  }
+
+  .sidebar-nav {
+    flex: 1;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    height: 100%;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .sidebar-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sidebar-section-label {
+    display: none !important;
+  }
+
+  .sidebar-menu {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    height: 100%;
+    padding: 0;
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  .sidebar-item {
+    height: 100%;
+    display: flex;
+    align-items: center;
+  }
+
+  .sidebar-link {
+    height: 100%;
+    display: flex !important;
+    align-items: center;
+    padding: 0 var(--space-md) !important;
+    border-left: none !important;
+    border-bottom: 3px solid transparent !important;
+    font-size: var(--font-size-sm);
+    white-space: nowrap;
+  }
+
+  .sidebar-link.active {
+    border-left: none !important;
+    border-bottom-color: var(--color-sidebar-accent) !important;
+    background: var(--color-sidebar-hover);
+  }
+
+  .sidebar-link:hover {
+    border-bottom-color: var(--color-sidebar-accent) !important;
+  }
+
+  .sidebar-icon {
+    display: none !important;
+  }
+
+  .sidebar-label {
+    display: block !important;
+  }
+
+  .sidebar-divider {
+    display: none;
+  }
+
+  .sidebar-footer {
+    display: none !important;
+  }
+
+  /* Fix 2 — Adjust Main Content Area */
+  .app-shell {
+    flex-direction: column;
+  }
+
+  .main-content {
+    margin-left: 0 !important;
+    margin-top: 48px;
+    width: 100%;
+    min-width: 0;
   }
 
   .topbar {
-    padding: 0 var(--space-lg);
+    padding: 0 var(--space-md);
   }
 
+  .page-content {
+    padding: var(--space-md);
+  }
+
+  /* Fix 3 — Eliminate Blank Space */
+  .app-shell,
+  .main-content {
+    min-height: unset;
+    height: auto;
+  }
+
+  .page-content {
+    padding-top: var(--space-md);
+    min-height: unset;
+  }
+
+  .toolbar {
+    margin-top: 0;
+  }
+
+  /* Fix 4 — Horizontal Scrollability */
+  .table-wrapper,
+  .records-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    border-radius: var(--radius-sm);
+  }
+
+  .table-wrapper .table,
+  .records-table-wrapper .records-table {
+    min-width: 700px;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+
+  .page-content {
+    overflow-x: hidden;
+  }
+
+  /* Fix 5 — Panel Layout */
   .detail-layout {
     grid-template-columns: 1fr;
   }
 
-  .login-brand-panel {
-    display: none;
+  .panel {
+    width: 100%;
+    min-width: 0;
   }
 
+  .panel-body {
+    padding: var(--space-md);
+  }
+
+  .panel-header {
+    padding: var(--space-sm) var(--space-md);
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+  }
+
+  /* Fix 6 — Toolbar */
   .toolbar {
     flex-direction: column;
     align-items: stretch;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  .toolbar-left {
+    flex-direction: column;
+    width: 100%;
+    gap: var(--space-sm);
+  }
+
+  .toolbar-right {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .toolbar .form-control,
+  .toolbar .form-select {
+    width: 100%;
+    min-width: unset;
+  }
+
+  /* Fix 7 — Login Page */
+  .login-shell {
+    flex-direction: column;
+  }
+
+  .login-brand-panel {
+    display: flex !important;
+    width: 100%;
+    min-height: unset;
+    padding: var(--space-lg) var(--space-md);
+    justify-content: center;
+    align-items: center;
+  }
+
+  .login-brand-title,
+  .login-brand-subtitle {
+    text-align: center;
+  }
+
+  .login-form-panel {
+    padding: var(--space-lg) var(--space-md);
+    align-items: stretch;
+  }
+
+  .login-form-box {
+    max-width: 100%;
+  }
+
+  /* Fix 8 — Definition Grid */
+  .definition-grid,
+  .detail-dl {
+    grid-template-columns: 1fr;
+  }
+
+  .definition-grid dt,
+  .detail-dt {
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-top: var(--space-sm);
+  }
+
+  .definition-grid dd,
+  .detail-dd {
+    padding-top: 0;
+    padding-bottom: var(--space-sm);
+  }
+
+  /* Fix 9 — Record Header Strip */
+  .record-header-strip {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-sm);
+  }
+
+  .record-header-meta {
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    width: 100%;
+  }
+
+  .record-header-equipment {
+    font-size: var(--font-size-lg);
   }
 }
 
