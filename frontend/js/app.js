@@ -108,6 +108,12 @@ function populateSidebar() {
   if (nameEl)  nameEl.textContent  = username || "\u2014";
   if (roleEl)  roleEl.textContent  = role    || "\u2014";
 
+  // New mobile elements — same logic, different IDs
+  const mobileAvatarEl = document.getElementById("mobileUserAvatar");
+  if (mobileAvatarEl && username) {
+      mobileAvatarEl.textContent = username.charAt(0).toUpperCase();
+  }
+
   // Show/hide Manage Users sidebar item based on role
   const manageUsersItem = document.getElementById("nav-manage-users-item");
   if (manageUsersItem) {
@@ -118,6 +124,15 @@ function populateSidebar() {
   const logoutBtn = document.getElementById("logoutBtn");
   if (logoutBtn) {
     logoutBtn.addEventListener("click", () => {
+      clearSession();
+      window.location.href = "index.html";
+    });
+  }
+
+  // New mobile logout — same action
+  const mobileLogoutBtn = document.getElementById("mobileLogoutBtn");
+  if (mobileLogoutBtn) {
+    mobileLogoutBtn.addEventListener("click", () => {
       clearSession();
       window.location.href = "index.html";
     });
@@ -184,12 +199,24 @@ function initChangePasswordModal() {
     });
   }
 
+  function _openChangePasswordModal() {
+    clearModalFields();
+    const bsModal = new bootstrap.Modal(modalEl);
+    bsModal.show();
+  }
+
   // ── 1. Avatar click: open modal and clear stale values ──
   if (avatarEl) {
     avatarEl.addEventListener("click", () => {
-      clearModalFields();
-      const bsModal = new bootstrap.Modal(modalEl);
-      bsModal.show();
+      _openChangePasswordModal();
+    });
+  }
+
+  // New mobile avatar — same action
+  const mobileAvatar = document.getElementById("mobileUserAvatar");
+  if (mobileAvatar) {
+    mobileAvatar.addEventListener("click", () => {
+      _openChangePasswordModal();
     });
   }
 
