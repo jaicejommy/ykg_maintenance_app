@@ -1277,6 +1277,9 @@ async function initRecordDetailPage() {
     }
   }
 
+  // Wire the Export PDF button — all authenticated roles
+  _initExportButton(recordId);
+
   // --- Section 2: CSV buttons role visibility ---
   const btnUpload   = document.getElementById("btn-csv-upload");
   const btnSave     = document.getElementById("btn-csv-save");
@@ -1401,6 +1404,29 @@ async function initRecordDetailPage() {
     if (_hasUnsavedChanges) {
       e.preventDefault();
       e.returnValue = "You have unsaved changes. Leave anyway?";
+    }
+  });
+}
+
+/**
+ * Wire the Export PDF button on the record detail page.
+ * Page-private helper — prefixed with _ per codebase convention.
+ * Uses ui.setLoading() to disable the button during the async PDF generation,
+ * preventing double-clicks. Errors are surfaced via ui.showToast().
+ * @param {number} recordId
+ */
+function _initExportButton(recordId) {
+  const btn = document.getElementById("exportPdfBtn");
+  if (!btn) return;
+
+  btn.addEventListener("click", async () => {
+    setLoading(btn, true);
+    try {
+      await exportRecordPdf(recordId);
+    } catch (err) {
+      showToast(err.message || "PDF export failed.", "error");
+    } finally {
+      setLoading(btn, false);
     }
   });
 }

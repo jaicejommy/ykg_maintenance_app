@@ -440,3 +440,47 @@ async function getEquipment(params = {}) {
   return response.json();
 }
 
+// ---------------------------------------------------------------------------
+// PDF Export
+// ---------------------------------------------------------------------------
+
+/**
+ * Export a single maintenance record as a PDF and trigger a browser download.
+ * Calls GET /api/export/{recordId}/pdf with a JWT Bearer header.
+ * On success, triggers an in-browser download of the returned PDF blob.
+ * On non-2xx, extracts the server's detail message and throws an Error.
+ * The temporary <a> element is removed immediately after .click() and the
+ * object URL is revoked immediately to prevent memory leaks.
+ * @param {number} recordId
+ */
+async function exportRecordPdf(recordId) {
+  const response = await fetch(`${API_BASE}/api/export/${recordId}/pdf`, {
+    method: "GET",
+    headers: buildAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    let detail = "PDF export failed.";
+    try {
+      const err = await response.json();
+      if (err.detail) detail = err.detail;
+    } catch (_) {
+      // JSON parse failed — use the default message
+    }
+    throw new Error(detail);
+  }
+
+  const blob = await response.blob();
+
+  // Trigger download via temporary <a> element
+  const url = URL.createObjectURL(blob);
+  const a   = document.createElement("a");
+  a.setAttribute("href", url);
+  a.setAttribute("download", `record_${recordId}_export.pdf`);
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+
+  // Revoke immediately after the click to avoid memory leaks
+  URL.revokeObjectURL(url);
+}

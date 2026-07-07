@@ -102,6 +102,14 @@
           <div class="record-header-equipment" id="detail-header-equipment">—</div>
         </div>
         <div class="record-header-meta">
+          <!-- Export PDF button — visible to all authenticated roles -->
+          <button
+            type="button"
+            class="btn btn-outline-secondary btn-sm"
+            id="exportPdfBtn"
+            title="Export this record as PDF">
+            Export PDF
+          </button>
           <!-- Edit Record button — hidden or shown by app.js based on role/ownership -->
           <a
             id="detail-edit-btn"
