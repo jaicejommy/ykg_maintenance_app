@@ -120,6 +120,12 @@ function populateSidebar() {
     manageUsersItem.classList.toggle("d-none", role !== ROLES.ADMIN);
   }
 
+  // Hide New Record sidebar item for Viewers
+  const newRecordNavItem = document.getElementById("nav-new-record-item");
+  if (newRecordNavItem) {
+    newRecordNavItem.classList.toggle("d-none", role === ROLES.VIEWER);
+  }
+
   // Wire sidebar logout button
   const logoutBtn = document.getElementById("logoutBtn");
   if (logoutBtn) {
@@ -336,8 +342,8 @@ function initDashboardPage() {
 
   // Hide "New Record" button for Viewers
   const newRecordBtn = document.getElementById("btn-new-record");
-  if (newRecordBtn && role === ROLES.VIEWER) {
-    newRecordBtn.style.display = "none";
+  if (newRecordBtn) {
+    newRecordBtn.classList.toggle("d-none", role === ROLES.VIEWER);
   }
 
   const searchInput    = document.getElementById("search-input");
@@ -530,6 +536,13 @@ async function initFormPage() {
   if (!form) return;
 
   guardPage();
+
+  // Viewers have no business on this page — redirect immediately before any rendering
+  if (getRole() === ROLES.VIEWER) {
+    window.location.href = "dashboard.html";
+    return; // stop execution immediately — no form rendering, no API calls
+  }
+
   populateNavbar();
   applyNavbarRoleVisibility();
 
