@@ -84,7 +84,7 @@ async def get_csv_data(
     record_id: int,
     current_user: dict = Depends(get_current_user),
 ):
-    """Return the CSV data for a record as { headers, rows }.
+    """Return the CSV data for a record as {headers, rows}.
     Returns 404 if no CSV data exists for this record.
     """
     try:
