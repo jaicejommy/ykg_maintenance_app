@@ -212,6 +212,17 @@ function renderRecordsTable(records, userRole, username) {
     const row = document.createElement("tr");
     row.dataset.recordId = record.id;
 
+    // ── Checkbox cell — first column, used by bulk-action selection logic ──
+    const checkboxTd = document.createElement("td");
+    checkboxTd.className = "col-checkbox";
+    const checkbox = document.createElement("input");
+    checkbox.type  = "checkbox";
+    checkbox.className = "record-checkbox";
+    checkbox.setAttribute("data-record-id", String(record.id));
+    checkbox.setAttribute("aria-label", "Select record " + record.id);
+    checkboxTd.appendChild(checkbox);
+    row.appendChild(checkboxTd);
+
     // # (record id badge)
     const idTd = document.createElement("td");
     const idBadge = document.createElement("span");

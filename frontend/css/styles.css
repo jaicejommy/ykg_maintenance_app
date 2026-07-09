@@ -2040,3 +2040,69 @@ textarea.form-control {
     flex-direction: column;
   }
 }
+
+/* ── Checkbox column ──────────────────────────────────────── */
+.col-checkbox {
+  width: 36px;
+  text-align: center;
+  padding: 0.4rem 0.5rem !important;
+  vertical-align: middle;
+}
+
+.col-checkbox input[type="checkbox"] {
+  cursor: pointer;
+  width: 15px;
+  height: 15px;
+  accent-color: var(--color-accent);
+}
+
+/* ── Bulk action bar ──────────────────────────────────────── */
+.bulk-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-lg);
+  background: var(--color-accent-subtle);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-md);
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.bulk-action-count {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+.bulk-action-buttons {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Selected row highlight */
+.table tbody tr.row-selected {
+  background: var(--color-accent-subtle) !important;
+  outline: 1px solid var(--color-accent);
+  outline-offset: -1px;
+}
+
+/* Mobile — stack bulk bar vertically */
+@media (max-width: 768px) {
+  .bulk-action-bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .bulk-action-buttons {
+    width: 100%;
+  }
+
+  .bulk-action-buttons .btn {
+    flex: 1;
+    text-align: center;
+  }
+}

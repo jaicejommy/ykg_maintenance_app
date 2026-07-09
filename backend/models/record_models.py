@@ -222,3 +222,23 @@ class RecordOut(BaseModel):
     # metadata on every list call. Populated via COUNT() subquery in list route;
     # populated via _get_attachment_count() on single-record responses.
     attachment_count: int = 0
+
+
+class BulkDeleteRequest(BaseModel):
+    """Request body for DELETE /api/records/bulk.
+
+    Validates that record_ids is a non-empty list of positive integers with
+    a maximum of 100 entries — all validation is server-side.
+    """
+
+    record_ids: list[int]
+
+    @model_validator(mode="after")
+    def validate_ids(self):
+        if not self.record_ids:
+            raise ValueError("record_ids must not be empty.")
+        if len(self.record_ids) > 100:
+            raise ValueError("Cannot delete more than 100 records at once.")
+        if any(rid <= 0 for rid in self.record_ids):
+            raise ValueError("All record IDs must be positive integers.")
+        return self

@@ -20,7 +20,7 @@ from backend.constants import (
     ROLES,
 )
 from backend.database import execute, fetch_all, fetch_one
-from backend.models.record_models import AttachmentOut, RecordCreate, RecordOut, RecordUpdate
+from backend.models.record_models import AttachmentOut, BulkDeleteRequest, RecordCreate, RecordOut, RecordUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -483,6 +483,58 @@ async def update_record(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred while updating the record.",
+        )
+
+
+# ---------------------------------------------------------------------------
+# DELETE /api/records/bulk — bulk soft delete (Administrator only)
+# IMPORTANT: This route MUST be registered before DELETE /api/records/{record_id}
+# so FastAPI does not interpret "bulk" as a record_id path parameter.
+# ---------------------------------------------------------------------------
+
+@router.delete("/api/records/bulk", status_code=status.HTTP_200_OK)
+async def bulk_delete_records(
+    body: BulkDeleteRequest,
+    current_user: dict = Depends(_admin_only),
+):
+    """Bulk soft-delete a list of records. Administrator only.
+
+    Accepts a JSON body: { "record_ids": [1, 4, 7, ...] }
+    Skips IDs that do not exist or are already soft-deleted — does not raise
+    errors for them. Returns a summary: { "deleted": n, "skipped": n }.
+    Validation (non-empty, all positive, max 100) is enforced by BulkDeleteRequest.
+    """
+    try:
+        username = current_user["sub"]
+        now_iso  = _now_utc_str()
+        deleted  = 0
+        skipped  = 0
+
+        for record_id in body.record_ids:
+            row = fetch_one(
+                "SELECT id FROM maintenance_records WHERE id = ? AND deleted_date IS NULL",
+                (record_id,),
+            )
+            if not row:
+                # Record does not exist or is already soft-deleted — skip silently
+                skipped += 1
+                continue
+
+            execute(
+                "UPDATE maintenance_records SET deleted_by = ?, deleted_date = ? WHERE id = ?",
+                (username, now_iso, record_id),
+            )
+            deleted += 1
+
+        return {"deleted": deleted, "skipped": skipped}
+
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error in bulk delete operation.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred during bulk delete.",
         )
 
 

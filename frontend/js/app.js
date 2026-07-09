@@ -359,6 +359,9 @@ function initDashboardPage() {
    * and re-render the table. No API call is made here.
    */
   function applyFilters() {
+    if (typeof window._dashboardClearSelection === "function") {
+      window._dashboardClearSelection();
+    }
     const currentFilters = {
       type:      typeFilter      ? typeFilter.value      : "",
       category:  categoryFilter  ? categoryFilter.value  : "",
@@ -460,12 +463,200 @@ function initDashboardPage() {
   }
 
   // Initial load
-  loadRecords();
+  loadRecords().then(() => {
+    _initBulkActions();
+  });
+}
+
+/**
+ * Wire all multi-record selection and bulk action behaviour on the dashboard.
+ * Called once after the initial table render inside initDashboardPage().
+ * Re-called after a bulk delete reloads the table.
+ *
+ * State is scoped inside this function — _selectedIds is not a global variable.
+ */
+function _initBulkActions() {
+  // Selection state — Set of selected record IDs
+  const _selectedIds = new Set();
+
+  // Update the bulk action bar visibility and selected count display
+  function _updateBulkActionBar() {
+    const bar     = document.getElementById("bulkActionBar");
+    const countEl = document.getElementById("selectedCount");
+    const count   = _selectedIds.size;
+    if (bar)     bar.style.display   = count > 0 ? "flex" : "none";
+    if (countEl) countEl.textContent = String(count);
+  }
+
+  // Clear all selections and reset UI
+  function _clearSelection() {
+    _selectedIds.clear();
+    const selectAll = document.getElementById("selectAllCheckbox");
+    if (selectAll) selectAll.checked = false;
+    // Uncheck all individual checkboxes
+    document.querySelectorAll(".record-checkbox").forEach((cb) => {
+      cb.checked = false;
+    });
+    _updateBulkActionBar();
+  }
+
+  // Expose _clearSelection so the outer applyFilters() can call it
+  window._dashboardClearSelection = _clearSelection;
+
+  // ── Event delegation on tbody for individual checkbox changes ──
+  const tbody = document.getElementById("records-tbody");
+  if (tbody) {
+    // Remove any previously attached bulk-actions delegator to avoid duplicate listeners
+    if (tbody._bulkActionsHandler) {
+      tbody.removeEventListener("change", tbody._bulkActionsHandler);
+    }
+    tbody._bulkActionsHandler = (e) => {
+      if (!e.target.classList.contains("record-checkbox")) return;
+      const id = parseInt(e.target.getAttribute("data-record-id"), 10);
+      if (e.target.checked) {
+        _selectedIds.add(id);
+        // Reflect row-selected class
+        const row = e.target.closest("tr");
+        if (row) row.classList.add("row-selected");
+      } else {
+        _selectedIds.delete(id);
+        const row = e.target.closest("tr");
+        if (row) row.classList.remove("row-selected");
+        // Uncheck select-all if not all are selected
+        const selectAll = document.getElementById("selectAllCheckbox");
+        if (selectAll) selectAll.checked = false;
+      }
+      _updateBulkActionBar();
+    };
+    tbody.addEventListener("change", tbody._bulkActionsHandler);
+  }
+
+  // ── Select All checkbox ──
+  const selectAll = document.getElementById("selectAllCheckbox");
+  if (selectAll) {
+    // Remove previous listener to avoid double-wiring on re-init
+    const newSelectAll = selectAll.cloneNode(true);
+    selectAll.parentNode.replaceChild(newSelectAll, selectAll);
+    newSelectAll.addEventListener("change", () => {
+      const checkboxes = document.querySelectorAll(".record-checkbox");
+      checkboxes.forEach((cb) => {
+        cb.checked = newSelectAll.checked;
+        const id = parseInt(cb.getAttribute("data-record-id"), 10);
+        const row = cb.closest("tr");
+        if (newSelectAll.checked) {
+          _selectedIds.add(id);
+          if (row) row.classList.add("row-selected");
+        } else {
+          _selectedIds.delete(id);
+          if (row) row.classList.remove("row-selected");
+        }
+      });
+      _updateBulkActionBar();
+    });
+  }
+
+  // ── Export Selected as PDF ──
+  const exportBtn = document.getElementById("bulkExportBtn");
+  if (exportBtn) {
+    // Clone to remove any previous listener
+    const newExportBtn = exportBtn.cloneNode(true);
+    exportBtn.parentNode.replaceChild(newExportBtn, exportBtn);
+    newExportBtn.addEventListener("click", async () => {
+      if (_selectedIds.size === 0) return;
+      const ids = Array.from(_selectedIds);
+      setLoading(newExportBtn, true);
+      const result = await exportRecordsPdfBulk(ids, (completed, total) => {
+        newExportBtn.textContent = `Exporting ${completed}/${total}...`;
+      });
+      setLoading(newExportBtn, false);
+      newExportBtn.textContent = "Export Selected as PDF"; // restore label
+      if (result.failed === 0) {
+        showToast(`${result.succeeded} PDF(s) exported successfully.`, "success");
+      } else {
+        showToast(`${result.succeeded} exported, ${result.failed} failed.`, "error");
+      }
+    });
+  }
+
+  // ── Bulk Delete (Administrator only) ──
+  const bulkDeleteBtn = document.getElementById("bulkDeleteBtn");
+  if (bulkDeleteBtn && getRole() === ROLES.ADMIN) {
+    bulkDeleteBtn.style.display = "inline-block";
+
+    // Clone to remove any previous listener
+    const newBulkDeleteBtn = bulkDeleteBtn.cloneNode(true);
+    bulkDeleteBtn.parentNode.replaceChild(newBulkDeleteBtn, bulkDeleteBtn);
+
+    newBulkDeleteBtn.addEventListener("click", () => {
+      if (_selectedIds.size === 0) return;
+      const ids   = Array.from(_selectedIds);
+      const count = ids.length;
+      _openBulkDeleteConfirm(ids, count, _clearSelection);
+    });
+  }
+
+  _updateBulkActionBar();
+}
+
+/**
+ * Open the bulk delete confirmation modal and wire its confirm button.
+ * Uses the dedicated #bulkDeleteModal added to dashboard.html.
+ * @param {number[]} ids - Selected record IDs to delete
+ * @param {number} count - Display count
+ * @param {function} clearSelection - Callback to clear selection state after success
+ */
+function _openBulkDeleteConfirm(ids, count, clearSelection) {
+  const modalEl   = document.getElementById("bulkDeleteModal");
+  const countEl   = document.getElementById("bulkDeleteCount");
+  const confirmBtn = document.getElementById("bulkDeleteConfirmBtn");
+  if (!modalEl || !confirmBtn) return;
+
+  if (countEl) countEl.textContent = String(count);
+
+  const bsModal = new bootstrap.Modal(modalEl);
+  bsModal.show();
+
+  // Clone confirm button to clear any prior listener
+  const newConfirmBtn = confirmBtn.cloneNode(true);
+  confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+
+  newConfirmBtn.addEventListener("click", async () => {
+    setLoading(newConfirmBtn, true);
+    try {
+      const result = await bulkDeleteRecords(ids);
+
+      // Close modal
+      bootstrap.Modal.getInstance(document.getElementById("bulkDeleteModal")).hide();
+
+      // Clear selection
+      if (clearSelection) clearSelection();
+
+      showToast(`${result.deleted} record(s) deleted, ${result.skipped} skipped.`, "success");
+
+      // Reload the table: dispatch a synthetic input on the search box which
+      // triggers loadRecords() after its 350 ms debounce. We then wait 500 ms
+      // to let the debounce + fetch + render complete, and re-initialise
+      // bulk actions so event delegation works on the freshly-rendered rows.
+      const searchInput = document.getElementById("search-input");
+      if (searchInput) {
+        searchInput.dispatchEvent(new Event("input"));
+      }
+      // Wait for debounce (350 ms) + fetch + render to settle before re-wiring
+      setTimeout(() => {
+        _initBulkActions();
+      }, 500);
+    } catch (err) {
+      showToast(err.message || "Bulk delete failed.", "error");
+    } finally {
+      setLoading(newConfirmBtn, false);
+    }
+  });
 }
 
 /**
  * Attach click listeners to every tbody row.
  * Clicks on action buttons stop propagation so they don't trigger navigation.
+ * Clicks on checkboxes or their cells are also ignored to prevent navigation.
  */
 function attachRowClickListeners(role, username) {
   const tbody = document.getElementById("records-tbody");
@@ -481,7 +672,11 @@ function attachRowClickListeners(role, username) {
       });
     });
 
-    tr.addEventListener("click", () => {
+    tr.addEventListener("click", (e) => {
+      // Do not navigate when clicking a checkbox or the checkbox cell
+      if (e.target.type === "checkbox" || e.target.classList.contains("col-checkbox")) {
+        return;
+      }
       window.location.href = `record-detail.html?id=${recordId}`;
     });
   });
@@ -1324,11 +1519,11 @@ async function initRecordDetailPage() {
     _hideCsvPlaceholder();
     if (btnDownload) btnDownload.classList.remove("d-none");
   } catch (err) {
-    if (err.message && err.message.includes("404")) {
-      // No CSV uploaded yet — show placeholder
+    if (err.status === 404) {
+      // No CSV uploaded yet — silently show empty state, no toast
       _showCsvPlaceholder();
     } else {
-      // Unexpected error — show placeholder and toast
+      // Unexpected server error — show toast and empty state
       showToast(err.message || "Failed to load CSV data.", "error");
       _showCsvPlaceholder();
     }

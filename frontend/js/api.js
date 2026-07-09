@@ -320,6 +320,8 @@ async function deleteAttachment(attachmentId) {
 /**
  * Fetch CSV data for a record.
  * Returns { headers: string[], rows: string[][] } or throws on non-2xx.
+ * The thrown Error has a `.status` property set to the HTTP status code so
+ * callers can distinguish 404 (no CSV yet) from genuine server errors.
  * @param {number} recordId
  * @returns {Promise<{headers: string[], rows: string[][]}>}
  */
@@ -330,7 +332,16 @@ async function getCsvData(recordId) {
   });
 
   if (!response.ok) {
-    await throwResponseError(response);
+    let detail = `HTTP ${response.status}: ${response.statusText}`;
+    try {
+      const body = await response.json();
+      if (body && body.detail) detail = body.detail;
+    } catch (_) {
+      // JSON parse failed — use the default status text
+    }
+    const err = new Error(detail);
+    err.status = response.status; // attach status for caller to check
+    throw err;
   }
   return response.json();
 }
@@ -483,4 +494,64 @@ async function exportRecordPdf(recordId) {
 
   // Revoke immediately after the click to avoid memory leaks
   URL.revokeObjectURL(url);
+}
+
+// ---------------------------------------------------------------------------
+// Bulk Operations
+// ---------------------------------------------------------------------------
+
+/**
+ * Bulk soft-delete a list of records (Administrator only).
+ * DELETE /api/records/bulk
+ * Body: JSON { "record_ids": [...] }
+ * Returns: { "deleted": n, "skipped": n }
+ * Throws Error(detail) on non-2xx.
+ * @param {number[]} recordIds
+ * @returns {Promise<{deleted: number, skipped: number}>}
+ */
+async function bulkDeleteRecords(recordIds) {
+  const response = await fetch(`${API_BASE}/api/records/bulk`, {
+    method: "DELETE",
+    headers: {
+      ...buildAuthHeaders(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ record_ids: recordIds }),
+  });
+
+  if (!response.ok) {
+    await throwResponseError(response);
+  }
+  return response.json();
+}
+
+/**
+ * Export multiple records as PDFs by calling exportRecordPdf() sequentially.
+ * No API call of its own — delegates to exportRecordPdf() per record.
+ * A 600 ms delay between downloads prevents the browser from blocking them.
+ * Never throws — per-record errors are caught internally and counted.
+ * onProgress(completed, total) is called after each record (success or failure).
+ * @param {number[]} recordIds
+ * @param {function(number, number)|undefined} onProgress
+ * @returns {Promise<{succeeded: number, failed: number}>}
+ */
+async function exportRecordsPdfBulk(recordIds, onProgress) {
+  let succeeded = 0;
+  let failed    = 0;
+  const total   = recordIds.length;
+
+  for (let i = 0; i < recordIds.length; i++) {
+    try {
+      await exportRecordPdf(recordIds[i]);
+      succeeded++;
+    } catch (_) {
+      failed++;
+    }
+    if (onProgress) onProgress(i + 1, total);
+    // Delay between downloads to prevent browser from blocking them
+    if (i < recordIds.length - 1) {
+      await new Promise(resolve => setTimeout(resolve, 600));
+    }
+  }
+  return { succeeded, failed };
 }
