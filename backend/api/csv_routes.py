@@ -57,8 +57,8 @@ def _strip_html(value: str) -> str:
 
 
 def _sanitize_cell(value: str) -> str:
-    """Strip whitespace and HTML tags from a single cell value."""
-    return _strip_html(value.strip())
+    """Strip whitespace from a single cell value. Do not strip angle brackets."""
+    return value.strip()
 
 
 def _get_active_record(record_id: int):
@@ -179,38 +179,35 @@ async def upload_csv(
                 detail="CSV must contain at least one header row and one data row.",
             )
 
-        raw_headers = [h.strip() for h in all_rows[0]]
-        raw_data    = all_rows[1:]
+        header_row = []
+        for row in all_rows:
+            if any(re.match(r'^<[^>]+>', cell.strip()) for cell in row):
+                first_cell = row[0].strip() if row else ""
+                if not (re.match(r'^<Table:\d+>', first_cell, re.IGNORECASE) or 
+                        re.match(r'^<Section:\d+>', first_cell, re.IGNORECASE) or 
+                        re.match(r'^<Options:\d+:[A-Za-z0-9]+>', first_cell, re.IGNORECASE)):
+                    header_row = row
+                    break
+        if not header_row:
+            header_row = all_rows[0]
 
         # --- Column count limit ---
-        if len(raw_headers) > MAX_CSV_COLUMNS:
+        if len(header_row) > MAX_CSV_COLUMNS:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"CSV may not exceed {MAX_CSV_COLUMNS} columns. Found {len(raw_headers)}.",
+                detail=f"CSV may not exceed {MAX_CSV_COLUMNS} columns. Found {len(header_row)}.",
             )
 
         # --- Row count limit ---
-        if len(raw_data) > MAX_CSV_ROWS:
+        if len(all_rows) > MAX_CSV_ROWS:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"CSV may not exceed {MAX_CSV_ROWS} data rows. Found {len(raw_data)}.",
+                detail=f"CSV may not exceed {MAX_CSV_ROWS} data rows. Found {len(all_rows)}.",
             )
 
-        # --- Jagged CSV check ---
-        col_count = len(raw_headers)
-        for i, row in enumerate(raw_data, start=2):
-            if len(row) != col_count:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=(
-                        f"Row {i} has {len(row)} column(s) but the header has {col_count}. "
-                        "All rows must have the same number of columns."
-                    ),
-                )
-
         # --- Sanitize ---
-        headers = [_sanitize_cell(h) for h in raw_headers]
-        rows    = [[_sanitize_cell(cell) for cell in row] for row in raw_data]
+        headers = [_sanitize_cell(h) for h in header_row]
+        rows    = [[_sanitize_cell(cell) for cell in row] for row in all_rows]
 
         # --- Persist ---
         username = current_user["sub"]
@@ -311,13 +308,6 @@ async def save_csv_data(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail=f"Row {i} is not a list.",
                 )
-            if len(row) != col_count:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=(
-                        f"Row {i} has {len(row)} cell(s) but headers define {col_count} column(s)."
-                    ),
-                )
             for j, cell in enumerate(row):
                 if not isinstance(cell, str):
                     raise HTTPException(
@@ -394,7 +384,8 @@ async def download_csv(
         # Reconstruct CSV in memory
         buffer = io.StringIO()
         writer = csv.writer(buffer)
-        writer.writerow(headers)
+        if headers not in rows:
+            writer.writerow(headers)
         writer.writerows(rows)
         buffer.seek(0)
 
