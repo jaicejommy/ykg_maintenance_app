@@ -655,64 +655,294 @@ function openTypeToConfirmModal({
 // CSV grid rendering
 // ---------------------------------------------------------------------------
 
-/**
- * Build and return an editable CSV grid <table> element.
- * Uses document.createElement only — never innerHTML — so no XSS risk from user data.
- *
- * @param {string[]}   headers    - Array of column header strings
- * @param {string[][]} rows       - Array of data rows (each row is an array of cell strings)
- * @param {boolean}    isEditable - If true, every <td> gets contenteditable="true"
- * @returns {HTMLTableElement}    - The constructed table; caller appends it to the DOM
- */
-function renderCsvGrid(headers, rows, isEditable) {
-  const table = document.createElement("table");
-  table.className = "table table-bordered table-sm csv-grid";
-  table.setAttribute("role", "grid");
-  table.setAttribute("aria-label", "CSV data grid");
+function _buildTypedCell(value, schema, isEditable, variantResolved) {
+    const td = document.createElement('td');
+    const v = (value === null || value === undefined) ? '' : String(value);
 
-  // --- <thead> ---
-  const thead = document.createElement("thead");
-  const headerRow = document.createElement("tr");
+    if (schema.type === 'no') {
+        td.className = 'checklist-cell-no';
+        td.textContent = v;
+        return td;
+    }
 
-  headers.forEach((headerText) => {
-    const th = document.createElement("th");
-    th.scope = "col";
-    th.textContent = headerText;
-    headerRow.appendChild(th);
-  });
+    if (schema.type === 'readonly') {
+        td.className = 'checklist-cell-readonly';
+        td.textContent = v;
+        return td;
+    }
 
-  thead.appendChild(headerRow);
-  table.appendChild(thead);
+    if (!isEditable) {
+        td.className = 'checklist-cell-readonly';
+        td.textContent = v;
+        return td;
+    }
 
-  // --- <tbody> ---
-  const tbody = document.createElement("tbody");
+    if (schema.type === 'list') {
+        const select = document.createElement('select');
+        select.className = 'checklist-select';
+        
+        const emptyOpt = document.createElement('option');
+        emptyOpt.value = '';
+        emptyOpt.textContent = '— Select —';
+        select.appendChild(emptyOpt);
 
-  rows.forEach((rowData, rowIndex) => {
-    const tr = document.createElement("tr");
+        let found = false;
+        if (schema.options) {
+            schema.options.forEach(opt => {
+                const option = document.createElement('option');
+                option.value = opt;
+                option.textContent = opt;
+                if (opt === v) {
+                    option.selected = true;
+                    found = true;
+                }
+                select.appendChild(option);
+            });
+        }
 
-    rowData.forEach((cellValue, colIndex) => {
-      const td = document.createElement("td");
-      td.textContent = cellValue;
+        if (v !== '' && !found) {
+            const legacyOpt = document.createElement('option');
+            legacyOpt.value = v;
+            legacyOpt.textContent = v + ' (legacy)';
+            legacyOpt.selected = true;
+            select.appendChild(legacyOpt);
+        }
 
-      if (isEditable) {
-        td.setAttribute("contenteditable", "true");
-        td.setAttribute("aria-label", `Row ${rowIndex + 1}, Column ${colIndex + 1}`);
-        // Prevent paste of HTML — handle paste as plain text
-        td.addEventListener("paste", (e) => {
-          e.preventDefault();
-          const text = (e.clipboardData || window.clipboardData).getData("text/plain");
-          document.execCommand("insertText", false, text);
+        td.appendChild(select);
+        return td;
+    }
+
+    if (schema.type === 'variant' && variantResolved) {
+        if (variantResolved.type === 'list') {
+            const select = document.createElement('select');
+            select.className = 'checklist-select';
+            
+            const emptyOpt = document.createElement('option');
+            emptyOpt.value = '';
+            emptyOpt.textContent = '— Select —';
+            select.appendChild(emptyOpt);
+
+            let found = false;
+            if (variantResolved.options) {
+                variantResolved.options.forEach(opt => {
+                    const option = document.createElement('option');
+                    option.value = opt;
+                    option.textContent = opt;
+                    if (opt === v) {
+                        option.selected = true;
+                        found = true;
+                    }
+                    select.appendChild(option);
+                });
+            }
+
+            if (v !== '' && !found) {
+                const legacyOpt = document.createElement('option');
+                legacyOpt.value = v;
+                legacyOpt.textContent = v + ' (legacy)';
+                legacyOpt.selected = true;
+                select.appendChild(legacyOpt);
+            }
+
+            td.appendChild(select);
+            return td;
+        }
+
+        if (variantResolved.type === 'numeric') {
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.inputMode = 'decimal';
+            input.className = 'checklist-input checklist-input--numeric';
+            input.value = v;
+            
+            input.addEventListener('keypress', (e) => {
+                if (!/[\d.-]/.test(e.key)) e.preventDefault();
+                if (e.key === '.' && input.value.includes('.')) e.preventDefault();
+                if (e.key === '-' && input.value.includes('-')) e.preventDefault();
+            });
+            input.addEventListener('blur', () => {
+                if (input.value !== '' && isNaN(Number(input.value))) {
+                    input.classList.add('checklist-cell-invalid');
+                    input.title = "Must be a number";
+                } else {
+                    input.classList.remove('checklist-cell-invalid');
+                    input.title = "";
+                }
+            });
+            td.appendChild(input);
+            return td;
+        }
+    }
+
+    // Default to text / int / float
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'checklist-input';
+    input.value = v;
+
+    if (schema.type === 'int') {
+        input.inputMode = 'numeric';
+        input.className += ' checklist-input--numeric';
+        input.addEventListener('keypress', (e) => {
+            if (!/[\d-]/.test(e.key)) e.preventDefault();
+            if (e.key === '-' && input.value.includes('-')) e.preventDefault();
         });
-      }
+        input.addEventListener('blur', () => {
+            if (input.value !== '' && !/^-?\d+$/.test(input.value)) {
+                input.classList.add('checklist-cell-invalid');
+                input.title = "Must be a whole number";
+            } else {
+                input.classList.remove('checklist-cell-invalid');
+                input.title = "";
+            }
+        });
+    } else if (schema.type === 'float') {
+        input.inputMode = 'decimal';
+        input.className += ' checklist-input--numeric';
+        input.addEventListener('keypress', (e) => {
+            if (!/[\d.-]/.test(e.key)) e.preventDefault();
+            if (e.key === '.' && input.value.includes('.')) e.preventDefault();
+            if (e.key === '-' && input.value.includes('-')) e.preventDefault();
+        });
+        input.addEventListener('blur', () => {
+            if (input.value !== '' && isNaN(Number(input.value))) {
+                input.classList.add('checklist-cell-invalid');
+                input.title = "Must be a number";
+            } else {
+                input.classList.remove('checklist-cell-invalid');
+                input.title = "";
+            }
+        });
+    }
 
-      tr.appendChild(td);
+    td.appendChild(input);
+    return td;
+}
+
+function renderCsvGrid(parsedCsv, isEditable) {
+    const wrapper   = document.createElement('div');
+    wrapper.className = 'checklist-wrapper';
+
+    if (!parsedCsv) {
+        const msg = document.createElement('p');
+        msg.className   = 'checklist-empty-msg';
+        msg.textContent = 'No checklist uploaded for this record.';
+        wrapper.appendChild(msg);
+        return wrapper;
+    }
+
+    // Title
+    if (parsedCsv.title) {
+        const titleEl = document.createElement('div');
+        titleEl.className   = 'checklist-title';
+        titleEl.textContent = parsedCsv.title;
+        wrapper.appendChild(titleEl);
+    }
+
+    const tableScroll = document.createElement('div');
+    tableScroll.className = 'checklist-scroll';
+
+    const table = document.createElement('table');
+    table.className = 'table table-bordered table-sm checklist-table';
+
+    // THEAD — visible columns only, clean labels
+    const thead = document.createElement('thead');
+    const hRow  = document.createElement('tr');
+    parsedCsv.visibleSchema.forEach(schema => {
+        const th = document.createElement('th');
+        th.textContent = schema.label;
+        hRow.appendChild(th);
+    });
+    thead.appendChild(hRow);
+    table.appendChild(thead);
+
+    // TBODY — interleave section rows and data rows in original order
+    const tbody  = document.createElement('tbody');
+    const merged = [
+        ...parsedCsv.sectionRows.map(s => ({
+            order: s.rowIndex, type: 'section', label: s.label
+        })),
+        ...parsedCsv.dataRows.map((d, di) => ({
+            order: d.rowIndex, type: 'data', values: d.values, dataIndex: di
+        })),
+    ].sort((a, b) => a.order - b.order);
+
+    merged.forEach(item => {
+        if (item.type === 'section') {
+            const tr = document.createElement('tr');
+            tr.className = 'checklist-section-row';
+            const td = document.createElement('td');
+            td.setAttribute('colspan', String(parsedCsv.visibleSchema.length));
+            td.textContent = item.label;
+            tr.appendChild(td);
+            tbody.appendChild(tr);
+            return;
+        }
+
+        // Data row
+        const tr = document.createElement('tr');
+        tr.setAttribute('data-data-index', String(item.dataIndex));
+
+        parsedCsv.visibleColIndexes.forEach(colIndex => {
+            const schema = parsedCsv.schemaArray[colIndex];
+            const value  = item.values[colIndex] !== undefined ? item.values[colIndex] : '';
+
+            // For variant columns: resolve per-row type using the meta column
+            let variantResolved = null;
+            if (schema.type === 'variant') {
+                const metaColIndex = parsedCsv.schemaArray.findIndex(
+                    s => s.type === 'meta' && s.key === schema.key + ':DataType'
+                );
+                const dataTypeValue = metaColIndex !== -1
+                    ? (item.values[metaColIndex] || '')
+                    : '';
+                variantResolved = window.csvSchema
+                    ? window.csvSchema.resolveVariantType(dataTypeValue, parsedCsv.optionsMap)
+                    : { type: 'text', options: null };
+            }
+
+            const td = _buildTypedCell(value, schema, isEditable, variantResolved);
+            td.setAttribute('data-col-index', String(colIndex));
+            tr.appendChild(td);
+        });
+
+        tbody.appendChild(tr);
     });
 
-    tbody.appendChild(tr);
-  });
+    table.appendChild(tbody);
+    tableScroll.appendChild(table);
+    wrapper.appendChild(tableScroll);
+    return wrapper;
+}
 
-  table.appendChild(tbody);
-  return table;
+function readCsvGridValues(tableEl, parsedCsv) {
+    const result = [];
+    if (!tableEl || !parsedCsv) return result;
+
+    tableEl.querySelectorAll('tbody tr[data-data-index]').forEach((tr) => {
+        const di = parseInt(tr.getAttribute('data-data-index'), 10);
+        // Start with original stored values (preserves hidden meta column values)
+        const original = parsedCsv.dataRows[di]
+            ? [...parsedCsv.dataRows[di].values]
+            : new Array(parsedCsv.schemaArray.length).fill('');
+
+        // Override only the visible, editable cells from the DOM
+        tr.querySelectorAll('td[data-col-index]').forEach(td => {
+            const colIndex = parseInt(td.getAttribute('data-col-index'), 10);
+            const schema   = parsedCsv.schemaArray[colIndex];
+            if (!schema || schema.type === 'no' || schema.type === 'readonly' || schema.type === 'meta') {
+                return; // keep original value
+            }
+            const sel   = td.querySelector('select');
+            const input = td.querySelector('input');
+            if (sel)   original[colIndex] = sel.value;
+            else if (input) original[colIndex] = input.value;
+        });
+
+        result.push(original);
+    });
+
+    return result;
 }
 
 // ---------------------------------------------------------------------------
