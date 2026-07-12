@@ -228,18 +228,18 @@
 
       </div><!-- /.detail-layout -->
 
-      <!-- ── CSV Data Panel (full width) ────────────────────────────────── -->
+      <!-- ── Checklist Panel (full width) ────────────────────────────────── -->
       <div class="detail-section-card">
         <div class="detail-section-header">
-          <h2 class="detail-section-title" style="font-size: 1rem;">CSV Data</h2>
+          <h2 class="detail-section-title" style="font-size: 1rem;">Checklist</h2>
           <div class="detail-section-actions" role="group" aria-label="CSV actions">
             <!-- Upload CSV — hidden for Viewers -->
             <button
               id="btn-csv-upload"
               type="button"
               class="btn btn-secondary d-none"
-              aria-label="Upload CSV file"
-            >&#8679; Upload CSV</button>
+              aria-label="Upload Checklist file"
+            >&#8679; Upload Checklist</button>
 
             <!-- Save Changes — hidden for Viewers; disabled until a cell is edited -->
             <button
@@ -264,8 +264,8 @@
               id="btn-csv-download"
               type="button"
               class="btn btn-secondary d-none"
-              aria-label="Download CSV file"
-            >&#8681; Download CSV</button>
+              aria-label="Download Checklist file"
+            >&#8681; Download Checklist</button>
           </div>
         </div>
 
@@ -281,9 +281,9 @@
         <!-- CSV placeholder — shown when no CSV data exists -->
         <div id="csv-placeholder" class="csv-empty-state" aria-live="polite">
           <div class="csv-empty-state-icon" aria-hidden="true">&#128196;</div>
-          <p class="mb-0">No CSV data uploaded for this record.</p>
+          <p class="mb-0">No checklist uploaded for this record.</p>
           <p class="meta-text" style="font-size: var(--font-size-sm);">
-            Use the <strong>Upload CSV</strong> button above to attach a CSV file.
+            Use the <strong>Upload Checklist</strong> button above to attach a checklist file.
           </p>
         </div>
 
@@ -344,6 +344,7 @@
 <script src="js/auth.js"></script>
 <script src="js/api.js"></script>
 <script src="js/validators.js"></script>
+<script src="js/csvSchema.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/app.js"></script>
 </body>

@@ -1406,11 +1406,7 @@ function initResetPasswordModal(reloadUsers) {
 // RECORD DETAIL PAGE
 // ---------------------------------------------------------------------------
 
-/** Module-level state for the CSV grid on the detail page. */
-let _originalCsvData  = null;  // deep copy at load / after save
-let _currentCsvData   = null;  // live working state
-let _hasUnsavedChanges = false;
-let _recordDetailId   = null;
+
 
 /**
  * Initialize the record detail page.
@@ -1445,7 +1441,6 @@ async function initRecordDetailPage() {
     window.location.replace("dashboard.html");
     return;
   }
-  _recordDetailId = recordId;
 
   // --- Load record ---
   let record = null;
@@ -1488,131 +1483,200 @@ async function initRecordDetailPage() {
   // Wire the Export PDF button — all authenticated roles
   _initExportButton(recordId);
 
-  // --- Section 2: CSV buttons role visibility ---
+  // --- Section 2: Checklist panel ---
+  let _allRows          = [];
+  let _parsedCsv        = null;
+  let _savedRows        = [];
+  let _checklistEl      = null;
+  let _isEditable       = false;
+  let _hasUnsavedChanges = false;
+
+  async function _loadChecklist(recordId, userRole) {
+      _isEditable = (userRole === 'Administrator' || userRole === 'Engineer / Operator');
+
+      const gridWrapEl   = document.getElementById('csv-grid-container');
+      const emptyStateEl = document.getElementById('csv-placeholder');
+      const downloadBtn  = document.getElementById('btn-csv-download');
+      const saveBtn      = document.getElementById('btn-csv-save');
+      const undoBtn      = document.getElementById('btn-csv-undo');
+
+      try {
+          const data    = await getCsvData(recordId);
+          _allRows      = data.rows;
+          _savedRows    = JSON.parse(JSON.stringify(_allRows));
+          _parsedCsv    = window.csvSchema ? window.csvSchema.parseFullCsv(_allRows) : null;
+
+          if (!_parsedCsv) {
+              throw new Error('Could not parse checklist structure.');
+          }
+
+          _renderChecklist();
+
+          if (emptyStateEl) emptyStateEl.style.display = 'none';
+          if (downloadBtn)  downloadBtn.classList.remove("d-none");
+          if (saveBtn)      saveBtn.disabled            = true;
+          if (undoBtn)      undoBtn.disabled            = true;
+
+      } catch (err) {
+          if (emptyStateEl) emptyStateEl.style.display = '';
+          if (gridWrapEl)   gridWrapEl.style.display   = 'none';
+          if (downloadBtn)  downloadBtn.classList.add("d-none");
+          if (saveBtn)      saveBtn.disabled  = true;
+          if (undoBtn)      undoBtn.disabled  = true;
+      }
+  }
+
+  function _renderChecklist() {
+      const gridWrapEl = document.getElementById('csv-grid-container');
+      if (!gridWrapEl || !_parsedCsv) return;
+
+      gridWrapEl.textContent = '';
+      _checklistEl = renderCsvGrid(_parsedCsv, _isEditable);
+      gridWrapEl.appendChild(_checklistEl);
+      gridWrapEl.style.display = '';
+
+      if (_isEditable) {
+          _checklistEl.addEventListener('input',  _onChecklistChange);
+          _checklistEl.addEventListener('change', _onChecklistChange);
+      }
+  }
+
+  function _onChecklistChange() {
+      _hasUnsavedChanges = true;
+      const saveBtn = document.getElementById('btn-csv-save');
+      const undoBtn = document.getElementById('btn-csv-undo');
+      if (saveBtn) saveBtn.disabled = false;
+      if (undoBtn) undoBtn.disabled = false;
+  }
+
+  await _loadChecklist(recordId, role);
+
   const btnUpload   = document.getElementById("btn-csv-upload");
   const btnSave     = document.getElementById("btn-csv-save");
   const btnUndo     = document.getElementById("btn-csv-undo");
   const btnDownload = document.getElementById("btn-csv-download");
-
-  const isViewer = (role === ROLES.VIEWER);
-
-  if (isViewer) {
-    if (btnUpload)   btnUpload.classList.add("d-none");
-    if (btnSave)     btnSave.classList.add("d-none");
-    if (btnUndo)     btnUndo.classList.add("d-none");
-  } else {
-    if (btnUpload)   btnUpload.classList.remove("d-none");
-    if (btnSave)   { btnSave.classList.remove("d-none");   btnSave.disabled  = true; }
-    if (btnUndo)   { btnUndo.classList.remove("d-none");   btnUndo.disabled  = true; }
-  }
-
-  // Download always hidden initially until we confirm CSV exists
-  if (btnDownload) btnDownload.classList.add("d-none");
-
-  // --- Attempt to load existing CSV data ---
-  try {
-    const csvData = await getCsvData(recordId);
-    // Success — CSV exists
-    _originalCsvData  = JSON.parse(JSON.stringify(csvData));
-    _currentCsvData   = JSON.parse(JSON.stringify(csvData));
-    _renderGrid(csvData.headers, csvData.rows, !isViewer);
-    _hideCsvPlaceholder();
-    if (btnDownload) btnDownload.classList.remove("d-none");
-  } catch (err) {
-    if (err.status === 404) {
-      // No CSV uploaded yet — silently show empty state, no toast
-      _showCsvPlaceholder();
-    } else {
-      // Unexpected server error — show toast and empty state
-      showToast(err.message || "Failed to load CSV data.", "error");
-      _showCsvPlaceholder();
-    }
-  }
-
-  // --- Wire Upload button ---
   const csvFileInput = document.getElementById("csvFileInput");
+
+  if (role !== ROLES.VIEWER && btnUpload) {
+      btnUpload.classList.remove("d-none");
+  }
+  if (role !== ROLES.VIEWER && btnSave) btnSave.classList.remove("d-none");
+  if (role !== ROLES.VIEWER && btnUndo) btnUndo.classList.remove("d-none");
+
   if (btnUpload && csvFileInput) {
-    btnUpload.addEventListener("click", () => {
-      csvFileInput.click();
-    });
+      btnUpload.addEventListener("click", () => csvFileInput.click());
+      csvFileInput.addEventListener("change", async () => {
+          const file = csvFileInput.files[0];
+          if (!file) return;
 
-    csvFileInput.addEventListener("change", async () => {
-      const file = csvFileInput.files[0];
-      if (!file) return;
+          const formData = new FormData();
+          formData.append("csv_file", file);
 
-      const formData = new FormData();
-      formData.append("csv_file", file);
-
-      setLoading(btnUpload, true);
-      try {
-        const result = await uploadCsv(recordId, formData);
-        _originalCsvData  = JSON.parse(JSON.stringify({ headers: result.headers, rows: result.rows }));
-        _currentCsvData   = JSON.parse(JSON.stringify({ headers: result.headers, rows: result.rows }));
-        _hasUnsavedChanges = false;
-        _renderGrid(result.headers, result.rows, !isViewer);
-        _hideCsvPlaceholder();
-        if (btnDownload) btnDownload.classList.remove("d-none");
-        if (btnSave)     btnSave.disabled  = true;
-        if (btnUndo)     btnUndo.disabled  = true;
-        showToast(`CSV uploaded successfully. ${result.row_count} rows, ${result.col_count} columns.`, "success");
-      } catch (err) {
-        showToast(err.message || "Failed to upload CSV.", "error");
-      } finally {
-        setLoading(btnUpload, false);
-        csvFileInput.value = "";
-      }
-    });
+          setLoading(btnUpload, true);
+          try {
+              const result = await uploadCsv(recordId, formData);
+              _allRows      = result.rows;
+              _savedRows    = JSON.parse(JSON.stringify(_allRows));
+              _parsedCsv    = window.csvSchema ? window.csvSchema.parseFullCsv(_allRows) : null;
+              
+              if (!_parsedCsv) throw new Error('Could not parse checklist structure.');
+              
+              _hasUnsavedChanges = false;
+              _renderChecklist();
+              
+              const emptyStateEl = document.getElementById('csv-placeholder');
+              if (emptyStateEl) emptyStateEl.style.display = 'none';
+              if (btnDownload)  btnDownload.classList.remove("d-none");
+              if (btnSave)      btnSave.disabled = true;
+              if (btnUndo)      btnUndo.disabled = true;
+              
+              showToast(`Checklist uploaded successfully.`, "success");
+          } catch (err) {
+              showToast(err.message || "Failed to upload checklist.", "error");
+          } finally {
+              setLoading(btnUpload, false);
+              csvFileInput.value = "";
+          }
+      });
   }
 
-  // --- Wire Save button ---
   if (btnSave) {
-    btnSave.addEventListener("click", async () => {
-      if (!_currentCsvData) return;
-      setLoading(btnSave, true);
-      try {
-        const saved = await saveCsvData(recordId, _currentCsvData);
-        _originalCsvData  = JSON.parse(JSON.stringify({ headers: saved.headers, rows: saved.rows }));
-        _hasUnsavedChanges = false;
-        if (btnSave) btnSave.disabled = true;
-        if (btnUndo) btnUndo.disabled = true;
-        showToast("CSV changes saved successfully.", "success");
-      } catch (err) {
-        showToast(err.message || "Failed to save CSV data.", "error");
-      } finally {
-        setLoading(btnSave, false);
-      }
-    });
+      btnSave.addEventListener("click", async () => {
+          if (!_parsedCsv || !_checklistEl) return;
+          const updatedDataRows = readCsvGridValues(_checklistEl, _parsedCsv);
+          
+          let isValid = true;
+          for (let di = 0; di < updatedDataRows.length; di++) {
+              for (let ci = 0; ci < _parsedCsv.schemaArray.length; ci++) {
+                  const schema = _parsedCsv.schemaArray[ci];
+                  const value = updatedDataRows[di][ci];
+                  let variantResolved = null;
+                  if (schema.type === 'variant') {
+                      const metaColIndex = _parsedCsv.schemaArray.findIndex(
+                          s => s.type === 'meta' && s.key === schema.key + ':DataType'
+                      );
+                      const dataTypeValue = metaColIndex !== -1 ? (updatedDataRows[di][metaColIndex] || '') : '';
+                      variantResolved = window.csvSchema.resolveVariantType(dataTypeValue, _parsedCsv.optionsMap);
+                  }
+                  const result = window.csvSchema.validateCellValue(value, schema, variantResolved);
+                  if (!result.valid) {
+                      showToast(`Row ${di + 1}: ${result.message}`, "error");
+                      isValid = false;
+                      break;
+                  }
+              }
+              if (!isValid) break;
+          }
+          if (!isValid) return;
+
+          const rebuiltRows = window.csvSchema.rebuildAllRows(_allRows, updatedDataRows, _parsedCsv.schemaArray);
+
+          setLoading(btnSave, true);
+          try {
+              await saveCsvData(recordId, { headers: _parsedCsv.schemaArray.map(s => s.rawHeader), rows: rebuiltRows });
+              _allRows = rebuiltRows;
+              _savedRows = JSON.parse(JSON.stringify(_allRows));
+              _parsedCsv = window.csvSchema.parseFullCsv(_allRows);
+              _hasUnsavedChanges = false;
+              _renderChecklist();
+              if (btnSave) btnSave.disabled = true;
+              if (btnUndo) btnUndo.disabled = true;
+              showToast("Checklist saved.", "success");
+          } catch (err) {
+              showToast(err.message || "Failed to save checklist.", "error");
+          } finally {
+              setLoading(btnSave, false);
+          }
+      });
   }
 
-  // --- Wire Undo button ---
   if (btnUndo) {
-    btnUndo.addEventListener("click", () => {
-      if (!_originalCsvData) return;
-      _currentCsvData    = JSON.parse(JSON.stringify(_originalCsvData));
-      _hasUnsavedChanges = false;
-      _renderGrid(_originalCsvData.headers, _originalCsvData.rows, !isViewer);
-      if (btnSave) btnSave.disabled = true;
-      if (btnUndo) btnUndo.disabled = true;
-    });
+      btnUndo.addEventListener("click", () => {
+          _allRows = JSON.parse(JSON.stringify(_savedRows));
+          _parsedCsv = window.csvSchema.parseFullCsv(_allRows);
+          _renderChecklist();
+          if (btnSave) btnSave.disabled = true;
+          if (btnUndo) btnUndo.disabled = true;
+          _hasUnsavedChanges = false;
+          showToast("Changes undone.", "success");
+      });
   }
 
-  // --- Wire Download button ---
   if (btnDownload) {
-    btnDownload.addEventListener("click", async () => {
-      try {
-        await downloadCsv(recordId);
-      } catch (err) {
-        showToast(err.message || "Failed to download CSV.", "error");
-      }
-    });
+      btnDownload.addEventListener("click", async () => {
+          try {
+              await downloadCsv(recordId);
+          } catch (err) {
+              showToast(err.message || "Failed to download checklist.", "error");
+          }
+      });
   }
 
-  // --- beforeunload guard ---
   window.addEventListener("beforeunload", (e) => {
-    if (_hasUnsavedChanges) {
-      e.preventDefault();
-      e.returnValue = "You have unsaved changes. Leave anyway?";
-    }
+      if (_hasUnsavedChanges) {
+          e.preventDefault();
+          e.returnValue = "";
+      }
   });
 }
 
