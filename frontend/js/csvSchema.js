@@ -1,0 +1,264 @@
+const ROW_TYPES = {
+    TITLE:   'title',
+    HEADER:  'header',
+    SECTION: 'section',
+    OPTIONS: 'options',
+    BLANK:   'blank',
+    DATA:    'data',
+};
+
+function classifyRow(row) {
+    if (!row || row.length === 0 || row.every(cell => (cell || '').trim() === '')) {
+        return ROW_TYPES.BLANK;
+    }
+    const first = (row[0] || '').trim();
+    if (/^<Table:\d+>/i.test(first)) return ROW_TYPES.TITLE;
+    if (/^<Section:\d+>/i.test(first)) return ROW_TYPES.SECTION;
+    if (/^<Options:\d+:[A-Za-z0-9]+>/i.test(first)) return ROW_TYPES.OPTIONS;
+    
+    const hasHeaderAnnotation = row.some(cell => /^<[^>]+>/.test((cell || '').trim()));
+    if (hasHeaderAnnotation) return ROW_TYPES.HEADER;
+    
+    return ROW_TYPES.DATA;
+}
+
+function parseColumnSchema(rawHeader) {
+    const raw = (rawHeader || '').trim();
+    const match = raw.match(/^<([^>]+)>(.*)$/);
+    if (!match) {
+        return {
+            rawHeader: rawHeader,
+            type: 'text',
+            key: null,
+            label: raw,
+            options: null,
+            hidden: false
+        };
+    }
+    
+    const annotation = match[1];
+    let label = match[2].trim();
+    let type = 'text';
+    let key = null;
+    let hidden = false;
+    let options = null;
+
+    if (annotation === 'No') {
+        type = 'no';
+    } else if (annotation === 'CheckItems') {
+        type = 'readonly';
+    } else if (annotation === 'int') {
+        type = 'int';
+    } else if (annotation === 'float') {
+        type = 'float';
+    } else if (annotation === 'text') {
+        type = 'text';
+    } else if (annotation.includes(':list')) {
+        type = 'list';
+        key = annotation.split(':')[0];
+    } else if (annotation.includes(':variant')) {
+        type = 'variant';
+        key = annotation.split(':')[0];
+    } else if (annotation.includes(':DataType')) {
+        type = 'meta';
+        key = annotation;
+        hidden = true;
+    } else if (annotation.includes(':text')) {
+        type = 'text';
+        key = annotation.split(':')[0];
+    } else if (annotation.startsWith('list:')) {
+        type = 'list';
+        options = annotation.substring(5).split(',').map(o => o.trim());
+    }
+    
+    if (!label && key) {
+        label = key;
+    } else if (!label && !key) {
+        label = annotation;
+    }
+
+    return {
+        rawHeader: rawHeader,
+        type: type,
+        key: key,
+        label: label,
+        options: options,
+        hidden: hidden
+    };
+}
+
+function parseOptionsRow(row) {
+    const first = (row[0] || '').trim();
+    const match = first.match(/^<Options:\d+:([A-Za-z0-9]+)>/i);
+    if (!match) return null;
+    const key = match[1];
+    const options = row.slice(1).map(v => (v || '').trim()).filter(v => v !== '');
+    return { key, options };
+}
+
+function parseFullCsv(allRows) {
+    if (!Array.isArray(allRows) || allRows.length === 0) return null;
+
+    let title          = null;
+    let headerRowIndex = -1;
+    let schemaArray    = [];
+    const optionsMap   = {};
+    const sectionRows  = [];
+    const dataRows     = [];
+
+    allRows.forEach((row, i) => {
+        const type = classifyRow(row);
+
+        if (type === ROW_TYPES.TITLE && !title) {
+            title = (row[0] || '').replace(/^<[^>]+>\s*/, '').trim() || null;
+        }
+
+        if (type === ROW_TYPES.HEADER && headerRowIndex === -1) {
+            headerRowIndex = i;
+            schemaArray    = row.map(parseColumnSchema);
+        }
+
+        if (type === ROW_TYPES.OPTIONS) {
+            const parsed = parseOptionsRow(row);
+            if (parsed) optionsMap[parsed.key] = parsed.options;
+        }
+
+        if (type === ROW_TYPES.SECTION) {
+            const label = (row[0] || '').replace(/^<[^>]+>\s*/, '').trim();
+            sectionRows.push({ rowIndex: i, label });
+        }
+
+        if (type === ROW_TYPES.DATA) {
+            dataRows.push({ rowIndex: i, values: row.map(v => (v || '').trim()) });
+        }
+    });
+
+    if (headerRowIndex === -1 || schemaArray.length === 0) return null;
+
+    schemaArray.forEach(schema => {
+        if (schema.type === 'list' && schema.key && optionsMap[schema.key]) {
+            schema.options = optionsMap[schema.key];
+        }
+    });
+
+    const visibleColIndexes = schemaArray
+        .map((s, i) => i)
+        .filter(i => !schemaArray[i].hidden);
+    const visibleSchema = visibleColIndexes.map(i => schemaArray[i]);
+
+    return {
+        title,
+        headerRowIndex,
+        schemaArray,
+        visibleSchema,
+        visibleColIndexes,
+        sectionRows,
+        dataRows,
+        optionsMap,
+    };
+}
+
+function resolveVariantType(dataTypeValue, optionsMap) {
+    const v = (dataTypeValue || '').trim();
+
+    if (!v || v === '') {
+        return { type: 'text', options: null };
+    }
+
+    if (v.toLowerCase() === 'numeric') {
+        return { type: 'numeric', options: null };
+    }
+
+    const bracketMatch = v.match(/^\[([A-Za-z0-9]+)\]$/);
+    if (bracketMatch) {
+        const key     = bracketMatch[1];
+        const options = optionsMap[key] || null;
+        return { type: options ? 'list' : 'text', options };
+    }
+
+    if (optionsMap[v]) {
+        return { type: 'list', options: optionsMap[v] };
+    }
+
+    return { type: 'text', options: null };
+}
+
+function validateCellValue(value, schema, variantResolved) {
+    if (['no', 'readonly', 'meta'].includes(schema.type)) {
+        return { valid: true, message: '' };
+    }
+
+    const v = (value === null || value === undefined) ? '' : String(value).trim();
+    if (v === '') return { valid: true, message: '' };
+
+    if (schema.type === 'int') {
+        if (!/^-?\d+$/.test(v)) {
+            return { valid: false, message: `"${schema.label}" must be a whole number.` };
+        }
+    }
+
+    if (schema.type === 'float') {
+        if (isNaN(Number(v))) {
+            return { valid: false, message: `"${schema.label}" must be a number.` };
+        }
+    }
+
+    if (schema.type === 'list' && Array.isArray(schema.options)) {
+        if (!schema.options.includes(v)) {
+            return { valid: false, message: `"${schema.label}" must be one of: ${schema.options.join(', ')}.` };
+        }
+    }
+
+    if (schema.type === 'variant' && variantResolved) {
+        if (variantResolved.type === 'numeric' && v !== '' && isNaN(Number(v))) {
+            return { valid: false, message: `"${schema.label}" must be a number.` };
+        }
+        if (variantResolved.type === 'list' && variantResolved.options) {
+            if (!variantResolved.options.includes(v)) {
+                return { valid: false, message: `"${schema.label}" must be one of: ${variantResolved.options.join(', ')}.` };
+            }
+        }
+    }
+
+    return { valid: true, message: '' };
+}
+
+function rebuildAllRows(allRows, updatedDataRows, schemaArray) {
+    const result   = allRows.map(row => [...row]);
+    let   dataIdx  = 0;
+    const noColIdx = schemaArray.findIndex(s => s.type === 'no');
+
+    result.forEach((row, i) => {
+        if (classifyRow(row) !== ROW_TYPES.DATA) return;
+        if (dataIdx >= updatedDataRows.length) return;
+
+        const updatedValues = updatedDataRows[dataIdx];
+        schemaArray.forEach((schema, colIndex) => {
+            if (schema.type === 'no' || schema.type === 'readonly' || schema.type === 'meta') {
+                return;
+            }
+            if (updatedValues[colIndex] !== undefined) {
+                result[i][colIndex] = updatedValues[colIndex];
+            }
+        });
+
+        if (noColIdx !== -1) {
+            result[i][noColIdx] = String(dataIdx + 1);
+        }
+
+        dataIdx++;
+    });
+
+    return result;
+}
+
+window.csvSchema = {
+    ROW_TYPES,
+    classifyRow,
+    parseColumnSchema,
+    parseOptionsRow,
+    parseFullCsv,
+    resolveVariantType,
+    validateCellValue,
+    rebuildAllRows
+};
