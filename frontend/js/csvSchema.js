@@ -56,9 +56,20 @@ function parseColumnSchema(rawHeader) {
     } else if (annotation.includes(':list')) {
         type = 'list';
         key = annotation.split(':')[0];
+    } else if (annotation.startsWith('list:')) {
+        type = 'list';
+        const remainder = annotation.substring(5).trim();
+        if (remainder.includes(',')) {
+            options = remainder.split(',').map(o => o.trim());
+        } else {
+            key = remainder; // <list:Key> support
+        }
     } else if (annotation.includes(':variant')) {
         type = 'variant';
         key = annotation.split(':')[0];
+    } else if (annotation.startsWith('variant:')) {
+        type = 'variant';
+        key = annotation.substring(8).trim(); // <variant:Key> support
     } else if (annotation.includes(':DataType')) {
         type = 'meta';
         key = annotation;
@@ -66,9 +77,9 @@ function parseColumnSchema(rawHeader) {
     } else if (annotation.includes(':text')) {
         type = 'text';
         key = annotation.split(':')[0];
-    } else if (annotation.startsWith('list:')) {
-        type = 'list';
-        options = annotation.substring(5).split(',').map(o => o.trim());
+    } else if (annotation.startsWith('text:')) {
+        type = 'text';
+        key = annotation.substring(5).trim();
     }
     
     if (!label && key) {
