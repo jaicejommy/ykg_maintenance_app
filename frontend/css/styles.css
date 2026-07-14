@@ -2220,3 +2220,30 @@ textarea.form-control {
   background-color: #fee2e2 !important;
   color: #991b1b !important;
 }
+
+/* -- Trash / Deleted Records Page -------------------------- */
+.trash-info-banner {
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md) var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.trash-info-text {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.trash-record-count {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.trash-empty {
+  text-align: center;
+  padding: var(--space-xl);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-base);
+}

@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Maintenance Management System — deleted records (Administrator only)." />
+  <title>Deleted Records — Maintenance Management System</title>
+  <link rel="stylesheet" href="css/bootstrap.min.css" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- =====================================================================
+       FIXED LEFT SIDEBAR
+       ===================================================================== -->
+  <aside class="sidebar" id="sidebar">
+
+    <!-- Logo / App Identity -->
+    <div class="sidebar-brand">
+      <span class="sidebar-brand-mark">MMS</span>
+      <span class="sidebar-brand-label">Maintenance<br>Management</span>
+    </div>
+
+    <div class="sidebar-divider"></div>
+
+    <!-- Primary Navigation -->
+    <nav class="sidebar-nav" role="navigation" aria-label="Main navigation">
+      <span class="section-label sidebar-section-label">Navigation</span>
+      <ul class="sidebar-menu">
+        <li class="sidebar-item">
+          <a href="dashboard.html" class="sidebar-link" id="nav-dashboard">
+            <span class="sidebar-icon">&#9783;</span>
+            <span class="sidebar-label">Dashboard</span>
+          </a>
+        </li>
+        <li class="sidebar-item" id="nav-new-record-item">
+          <a href="form.html" class="sidebar-link" id="nav-new-record">
+            <span class="sidebar-icon">+</span>
+            <span class="sidebar-label">New Record</span>
+          </a>
+        </li>
+        <!-- Shown only for Administrators — toggled via app.js -->
+        <li class="sidebar-item" id="nav-manage-users-item">
+          <a href="manage-users.html" class="sidebar-link" id="nav-manage-users">
+            <span class="sidebar-icon">&#9707;</span>
+            <span class="sidebar-label">Manage Users</span>
+          </a>
+        </li>
+        
+        <!-- Add after existing nav items, before sidebar-footer -->
+        <li class="sidebar-divider" style="margin: var(--space-sm) 0; height: 1px; background: var(--color-sidebar-border);"></li>
+        
+        <li class="sidebar-item" id="nav-trash-item">
+          <a href="trash.html" class="sidebar-link" id="nav-trash">
+            <span class="sidebar-icon">&#8942;</span>
+            <span class="sidebar-label">Deleted Records</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+
+    <!-- Mobile-only user controls — hidden on desktop via CSS -->
+    <div class="sidebar-mobile-controls" id="sidebarMobileControls">
+      <button
+        type="button"
+        class="sidebar-mobile-avatar"
+        id="mobileUserAvatar"
+        title="Change Password">
+      </button>
+      <button
+        type="button"
+        class="sidebar-mobile-logout"
+        id="mobileLogoutBtn"
+        title="Logout">
+        Logout
+      </button>
+    </div>
+
+    <div class="sidebar-divider"></div>
+
+    <!-- Bottom: User Info + Logout -->
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-user-avatar" id="sidebarUserAvatar" style="cursor: pointer;" title="Change Password">—</div>
+        <div class="sidebar-user-info">
+          <span class="sidebar-user-name" id="sidebarUsername">—</span>
+          <span class="sidebar-user-role" id="sidebarUserRole">—</span>
+        </div>
+      </div>
+      <button class="sidebar-logout-btn" id="logoutBtn">Logout</button>
+    </div>
+
+  </aside>
+
+  <!-- =====================================================================
+       MAIN CONTENT AREA
+       ===================================================================== -->
+  <main class="main-content" role="main">
+
+    <!-- Top Bar -->
+    <header class="topbar">
+      <span class="topbar-title">Deleted Records</span>
+      <span class="topbar-meta" id="topbar-user-meta"></span>
+    </header>
+
+    <!-- Page Content -->
+    <div class="page-content" id="trashPage">
+
+      <!-- Deleted records table -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-header-title">Deleted Records</span>
+          <span class="trash-record-count" id="trashRecordCount"></span>
+        </div>
+        <div class="panel-body" style="padding: 0;">
+          <div class="table-wrapper">
+            <table class="table" id="trashTable">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Equipment ID</th>
+                  <th>Type</th>
+                  <th>Responsible Person</th>
+                  <th>Created By</th>
+                  <th>Deleted By</th>
+                  <th>Deleted Date</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="trashTableBody">
+                <!-- Populated by app.js -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty state -->
+      <div class="trash-empty" id="trashEmpty" style="display:none;">
+        <p>No deleted records found.</p>
+      </div>
+
+    </div><!-- /.page-content -->
+
+  </main>
+
+</div><!-- /.app-shell -->
+
+<!-- Toast container -->
+<div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+<!-- =====================================================================
+     RESTORE CONFIRMATION MODAL
+     ===================================================================== -->
+<div class="modal fade" id="restoreConfirmModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Restore Record</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>
+          Restore record for equipment
+          <strong id="restoreEquipmentId"></strong>?
+        </p>
+        <p class="meta-text">
+          This record will reappear immediately on the dashboard
+          for all users.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary"
+          data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary"
+          id="restoreConfirmBtn">Restore</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- =====================================================================
+     CHANGE PASSWORD MODAL
+     Triggered by clicking the sidebar avatar (#sidebarUserAvatar).
+     Wired in app.js initChangePasswordModal().
+     ===================================================================== -->
+<div class="modal fade" id="changePasswordModal" tabindex="-1" aria-labelledby="changePasswordModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="changePasswordModalLabel">Change Password</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <!-- Dummy username to prevent browser password managers from hijacking preceding text fields -->
+        <input type="text" name="dummy_username" autocomplete="username" style="position: absolute; opacity: 0; height: 0; width: 0; z-index: -1;" aria-hidden="true">
+        <div class="mb-3">
+          <label class="form-label" for="currentPassword">Current Password</label>
+          <input type="password" class="form-control" id="currentPassword" autocomplete="current-password">
+          <div class="invalid-feedback" id="currentPassword-error"></div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="newPassword">New Password</label>
+          <input type="password" class="form-control" id="newPassword" autocomplete="new-password">
+          <div class="invalid-feedback" id="newPassword-error"></div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="confirmNewPassword">Confirm New Password</label>
+          <input type="password" class="form-control" id="confirmNewPassword" autocomplete="new-password">
+          <div class="invalid-feedback" id="confirmNewPassword-error"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="changePasswordSubmitBtn">Change Password</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/bootstrap.bundle.min.js"></script>
+<script src="js/constants.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/api.js"></script>
+<script src="js/validators.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
