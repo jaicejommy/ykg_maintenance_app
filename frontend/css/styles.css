@@ -350,6 +350,7 @@ code, .mono {
 .main-content {
   margin-left: var(--sidebar-width);
   flex: 1;
+  min-width: 0; /* prevent flex child from growing past .app-shell */
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -384,6 +385,7 @@ code, .mono {
 .page-content {
   padding: var(--space-xl);
   flex: 1;
+  min-width: 0; /* prevent flex child from growing past .main-content */
 }
 
 /* ============================================================
@@ -1427,6 +1429,7 @@ textarea.form-control {
   box-shadow: var(--shadow-card);
   padding: var(--space-lg);
   margin-bottom: var(--space-lg);
+  min-width: 0; /* prevent checklist card from expanding past .page-content */
 }
 
 .detail-section-header {
@@ -2125,6 +2128,7 @@ textarea.form-control {
 }
 .checklist-scroll {
   width: 100%;
+  min-width: 0; /* Fix E — prevent scroll container from expanding past its parent on desktop */
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
