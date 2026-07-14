@@ -806,7 +806,7 @@ textarea.form-control {
 .records-table-wrapper {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  overflow: hidden;
+  overflow-x: auto;
   background: var(--color-surface);
   box-shadow: var(--shadow-card);
 }
@@ -2246,4 +2246,27 @@ textarea.form-control {
   padding: var(--space-xl);
   color: var(--color-text-secondary);
   font-size: var(--font-size-base);
+}
+/* -- Sortable column headers -------------------------------- */
+th.sortable-col {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+th.sortable-col:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+th.sort-active {
+  color: #FFFFFF;
+  opacity: 1;
+}
+
+.sort-indicator {
+  font-size: 0.65rem;
+  margin-left: 3px;
+  opacity: 0.85;
+  display: inline-block;
+  min-width: 10px;
 }
