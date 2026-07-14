@@ -126,6 +126,11 @@ function populateSidebar() {
     newRecordNavItem.classList.toggle("d-none", role === ROLES.VIEWER);
   }
 
+  const trashNavItem = document.getElementById('nav-trash-item');
+  if (trashNavItem) {
+      trashNavItem.classList.toggle('d-none', role !== ROLES.ADMIN);
+  }
+
   // Wire sidebar logout button
   const logoutBtn = document.getElementById("logoutBtn");
   if (logoutBtn) {
@@ -1884,4 +1889,137 @@ document.addEventListener("DOMContentLoaded", () => {
   initFormPage();
   initManageUsersPage();
   initRecordDetailPage();
+  if (document.getElementById('trashPage')) initTrashPage();
 });
+
+// ---------------------------------------------------------------------------
+// TRASH PAGE
+// ---------------------------------------------------------------------------
+
+async function initTrashPage() {
+    guardPage();
+
+    // Administrator only — redirect non-admins immediately
+    if (getRole() !== 'Administrator') {
+        window.location.href = 'dashboard.html';
+        return;
+    }
+
+    populateSidebar();
+
+    // Set active nav link
+    const navLink = document.getElementById('nav-trash-item');
+    if (navLink) navLink.classList.add('active');
+
+    // Set topbar meta
+    const metaEl = document.getElementById('topbar-user-meta');
+    if (metaEl) {
+        metaEl.textContent = getUsername() + ' — ' + getRole();
+    }
+
+    await _loadDeletedRecords();
+}
+
+async function _loadDeletedRecords() {
+    const tbody      = document.getElementById('trashTableBody');
+    const emptyEl    = document.getElementById('trashEmpty');
+    const countEl    = document.getElementById('trashRecordCount');
+
+    try {
+        const records = await getDeletedRecords();
+
+        // Update count
+        if (countEl) {
+            countEl.textContent = records.length > 0
+                ? records.length + ' record(s)'
+                : '';
+        }
+
+        if (records.length === 0) {
+            if (tbody)   tbody.textContent  = '';
+            if (emptyEl) emptyEl.style.display = '';
+            return;
+        }
+
+        if (emptyEl) emptyEl.style.display = 'none';
+        _renderTrashTable(records);
+
+    } catch (err) {
+        showToast(err.message || 'Failed to load deleted records.', 'error');
+    }
+}
+
+function _renderTrashTable(records) {
+    const tbody = document.getElementById('trashTableBody');
+    if (!tbody) return;
+
+    tbody.textContent = ''; // clear
+
+    records.forEach((record, index) => {
+        const tr = document.createElement('tr');
+
+        // Helper: append a plain text cell
+        function appendCell(text) {
+            const td = document.createElement('td');
+            td.textContent = text || '—';
+            tr.appendChild(td);
+        }
+
+        appendCell(String(index + 1));
+        appendCell(record.equipment_id);
+        appendCell(record.maintenance_type);
+        appendCell(record.responsible_person);
+        appendCell(record.created_by);
+        appendCell(record.deleted_by);
+        appendCell(record.deleted_date
+            ? new Date(record.deleted_date).toLocaleString()
+            : '—'
+        );
+
+        // Restore button cell
+        const actionTd  = document.createElement('td');
+        const restoreBtn = document.createElement('button');
+        restoreBtn.type      = 'button';
+        restoreBtn.className = 'btn btn-sm btn-outline-secondary';
+        restoreBtn.textContent = 'Restore';
+        restoreBtn.setAttribute('data-record-id', String(record.id));
+        restoreBtn.addEventListener('click', () => _openRestoreConfirm(record));
+        actionTd.appendChild(restoreBtn);
+        tr.appendChild(actionTd);
+
+        tbody.appendChild(tr);
+    });
+}
+
+function _openRestoreConfirm(record) {
+    const modal       = document.getElementById('restoreConfirmModal');
+    const equipmentEl = document.getElementById('restoreEquipmentId');
+    const confirmBtn  = document.getElementById('restoreConfirmBtn');
+
+    if (!modal || !equipmentEl || !confirmBtn) return;
+
+    // Populate modal content via textContent — never innerHTML
+    equipmentEl.textContent = record.equipment_id;
+
+    // Remove any previous listener before adding a new one
+    // Clone-replace is the cleanest approach
+    const newConfirmBtn = confirmBtn.cloneNode(true);
+    confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+
+    newConfirmBtn.addEventListener('click', async () => {
+        setLoading(newConfirmBtn, true);
+        try {
+            await restoreRecord(record.id);
+            bootstrap.Modal.getInstance(modal).hide();
+            showToast('Record restored successfully.', 'success');
+            // Reload the table to reflect the change
+            await _loadDeletedRecords();
+        } catch (err) {
+            showToast(err.message || 'Restore failed.', 'error');
+        } finally {
+            setLoading(newConfirmBtn, false);
+        }
+    });
+
+    new bootstrap.Modal(modal).show();
+}
