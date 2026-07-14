@@ -20,7 +20,7 @@ from backend.constants import (
     ROLES,
 )
 from backend.database import execute, fetch_all, fetch_one
-from backend.models.record_models import AttachmentOut, BulkDeleteRequest, RecordCreate, RecordOut, RecordUpdate
+from backend.models.record_models import AttachmentOut, BulkDeleteRequest, RecordCreate, RecordOut, RecordUpdate, DeletedRecordOut
 
 logger = logging.getLogger(__name__)
 
@@ -145,10 +145,11 @@ def _row_to_record_out(row, attachment_count: int = 0) -> RecordOut:
 
 @router.get("/api/records")
 async def list_records(
+    status: str = "active",
     type: Optional[str] = None,
     search: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
-) -> list[RecordOut]:
+) -> list:
     """Return all active (non-deleted) maintenance records.
 
     Each record includes a lightweight attachment_count (COUNT subquery) so the
@@ -159,7 +160,21 @@ async def list_records(
     - ``search``: keyword search across equipment_id, responsible_person, remarks
     """
     try:
-        conditions = ["deleted_date IS NULL"]
+        role = current_user.get("role")
+        if status == "active":
+            conditions = ["deleted_date IS NULL"]
+        elif status == "deleted":
+            if role != ROLES["ADMIN"]:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Only Administrators can view deleted records.",
+                )
+            conditions = ["deleted_date IS NOT NULL"]
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="status must be 'active' or 'deleted'."
+            )
         params: list = []
 
         if type:
@@ -182,7 +197,23 @@ async def list_records(
             f"FROM maintenance_records WHERE {where_clause} ORDER BY id DESC"
         )
         rows = fetch_all(query, tuple(params))
-        return [_row_to_record_out(r, attachment_count=r["attachment_count"]) for r in rows]
+        
+        if status == "deleted":
+            return [
+                DeletedRecordOut(
+                    id=r["id"],
+                    maintenance_type=r["maintenance_type"],
+                    equipment_id=r["equipment_id"],
+                    created_time=r["created_time"] or "",
+                    responsible_person=r["responsible_person"],
+                    created_by=r["created_by"],
+                    created_date=r["created_date"],
+                    deleted_by=r["deleted_by"],
+                    deleted_date=r["deleted_date"]
+                ) for r in rows
+            ]
+        else:
+            return [_row_to_record_out(r, attachment_count=r["attachment_count"]) for r in rows]
 
     except HTTPException:
         raise
@@ -483,6 +514,49 @@ async def update_record(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred while updating the record.",
+        )
+
+
+# ---------------------------------------------------------------------------
+# PATCH /api/records/{record_id}/restore — restore soft deleted record
+# ---------------------------------------------------------------------------
+
+@router.patch("/api/records/{record_id}/restore", status_code=status.HTTP_200_OK)
+async def restore_record(
+    record_id: int,
+    current_user: dict = Depends(_admin_only),
+):
+    """Restore a soft-deleted record. Administrator only."""
+    try:
+        row = fetch_one(
+            "SELECT id, deleted_date, equipment_id FROM maintenance_records WHERE id = ?",
+            (record_id,)
+        )
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Record not found."
+            )
+        
+        if row["deleted_date"] is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Record is not deleted and cannot be restored."
+            )
+            
+        execute(
+            "UPDATE maintenance_records SET deleted_by = NULL, deleted_date = NULL WHERE id = ?",
+            (record_id,)
+        )
+        return {"detail": "Record restored successfully.", "id": record_id}
+        
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error restoring record id %s.", record_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred."
         )
 
 
