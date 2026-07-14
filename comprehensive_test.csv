@@ -1,7 +1,7 @@
 <Table:1>,Comprehensive System Test Checklist,,,,,,,,
 <Options:1:GlobalStatus>,OK,Warning,Critical,,,,,
 <Options:2:PowerType>,AC,DC,Solar,,,,,
-<No>,<CheckItems> Instruction,<int> Whole Num,<float> Decimal Num,<list:GlobalStatus> Status,"<list:Yes,No,N/A> Direct List",<variant:Dynamic> Dynamic Input,<Dynamic:DataType> Hidden Meta,<text> Remarks
+<No>,<CheckItems> Instruction,<int> Whole Num,<float> Decimal Num,<GlobalStatus:list> Status,"<list:Yes,No,N/A> Direct List",<Dynamic:variant> Dynamic Input,<Dynamic:DataType> Hidden Meta,<text> Remarks
 <Section:1>,Basic Inputs Test,,,,,,,,
 ,Enter exactly 5 for testing,,,,,,,,
 ,Enter 3.14 for testing,,,,,,,,
