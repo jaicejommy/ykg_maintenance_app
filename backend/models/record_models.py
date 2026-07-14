@@ -224,6 +224,18 @@ class RecordOut(BaseModel):
     attachment_count: int = 0
 
 
+class DeletedRecordOut(BaseModel):
+    id: int
+    maintenance_type: str
+    equipment_id: str
+    created_time: Optional[str] = None
+    responsible_person: str
+    created_by: str
+    created_date: str
+    deleted_by: str
+    deleted_date: str
+
+
 class BulkDeleteRequest(BaseModel):
     """Request body for DELETE /api/records/bulk.
 
