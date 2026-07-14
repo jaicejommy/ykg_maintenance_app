@@ -109,7 +109,9 @@ function parseFullCsv(allRows) {
         const type = classifyRow(row);
 
         if (type === ROW_TYPES.TITLE && !title) {
-            title = (row[0] || '').replace(/^<[^>]+>\s*/, '').trim() || null;
+            let extracted = (row[0] || '').replace(/^<[^>]+>\s*/, '').trim();
+            if (!extracted) extracted = (row[1] || '').trim();
+            title = extracted || null;
         }
 
         if (type === ROW_TYPES.HEADER && headerRowIndex === -1) {
@@ -123,7 +125,8 @@ function parseFullCsv(allRows) {
         }
 
         if (type === ROW_TYPES.SECTION) {
-            const label = (row[0] || '').replace(/^<[^>]+>\s*/, '').trim();
+            let label = (row[0] || '').replace(/^<[^>]+>\s*/, '').trim();
+            if (!label) label = (row[1] || '').trim();
             sectionRows.push({ rowIndex: i, label });
         }
 
