@@ -20,6 +20,20 @@ VALID_ROLES = set(ROLES.values())
 MAINTENANCE_TYPES = ["Planned", "Conducted"]
 
 # ---------------------------------------------------------------------------
+# Sort configurations
+# ---------------------------------------------------------------------------
+ALLOWED_SORT_COLUMNS = {
+    "id",
+    "created_time",
+    "planned_start",
+    "planned_end",
+    "last_updated_time",
+    "equipment_id",
+    "maintenance_type",
+    "responsible_person",
+}
+
+# ---------------------------------------------------------------------------
 # Equipment categories
 # ---------------------------------------------------------------------------
 EQUIPMENT_CATEGORIES = ["FIC", "ROS", "KYC"]
