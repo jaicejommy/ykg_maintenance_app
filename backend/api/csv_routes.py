@@ -352,6 +352,17 @@ async def save_csv_data(
             (json.dumps(clean_headers), json.dumps(clean_rows), username, now, record_id),
         )
 
+        execute(
+            """
+            UPDATE maintenance_records
+            SET last_updated_time = ?,
+                updated_by        = ?,
+                updated_date      = ?
+            WHERE id = ?
+            """,
+            (now, username, now, record_id),
+        )
+
         return {"headers": clean_headers, "rows": clean_rows}
 
     except HTTPException:
