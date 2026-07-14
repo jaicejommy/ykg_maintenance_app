@@ -2036,6 +2036,27 @@ textarea.form-control {
   .record-header-equipment {
     font-size: var(--font-size-lg);
   }
+
+  /* Fix 10 — Checklist section header: stack title + buttons vertically on mobile */
+  .detail-section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-sm);
+  }
+
+  .detail-section-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-sm);
+    width: 100%;
+  }
+
+  .detail-section-actions .btn {
+    width: 100%;
+    justify-content: center;
+    font-size: var(--font-size-xs);
+    padding: 0.45rem 0.5rem;
+  }
 }
 
 @media (max-width: 480px) {
