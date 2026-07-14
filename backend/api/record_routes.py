@@ -18,6 +18,7 @@ from backend.constants import (
     ATTACHMENTS_DIR,
     MAX_ATTACHMENTS_PER_RECORD,
     ROLES,
+    ALLOWED_SORT_COLUMNS,
 )
 from backend.database import execute, fetch_all, fetch_one
 from backend.models.record_models import AttachmentOut, BulkDeleteRequest, RecordCreate, RecordOut, RecordUpdate, DeletedRecordOut
@@ -148,6 +149,8 @@ async def list_records(
     status: str = "active",
     type: Optional[str] = None,
     search: Optional[str] = None,
+    sort_by: str = "id",
+    sort_order: str = "desc",
     current_user: dict = Depends(get_current_user),
 ) -> list:
     """Return all active (non-deleted) maintenance records.
@@ -181,6 +184,17 @@ async def list_records(
             conditions.append("maintenance_type = ?")
             params.append(type)
 
+        if sort_by not in ALLOWED_SORT_COLUMNS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid sort_by value. Allowed: {', '.join(sorted(ALLOWED_SORT_COLUMNS))}"
+            )
+        if sort_order not in ("asc", "desc"):
+            raise HTTPException(
+                status_code=400,
+                detail="sort_order must be 'asc' or 'desc'."
+            )
+
         if search:
             keyword = f"%{search}%"
             conditions.append(
@@ -189,12 +203,13 @@ async def list_records(
             params.extend([keyword, keyword, keyword])
 
         where_clause = " AND ".join(conditions)
+        order_clause = f"ORDER BY {sort_by} {sort_order.upper()}"
         # Subquery COUNT keeps the dashboard payload light — no full attachment list here.
         query = (  # noqa: S608
             "SELECT maintenance_records.*, "
             "COALESCE((SELECT COUNT(*) FROM record_attachments "
             "           WHERE record_id = maintenance_records.id), 0) AS attachment_count "
-            f"FROM maintenance_records WHERE {where_clause} ORDER BY id DESC"
+            f"FROM maintenance_records WHERE {where_clause} {order_clause}"
         )
         rows = fetch_all(query, tuple(params))
         
