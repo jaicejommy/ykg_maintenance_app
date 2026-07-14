@@ -222,6 +222,17 @@ async def upload_csv(
             (record_id, json.dumps(headers), json.dumps(rows), username, now),
         )
 
+        execute(
+            """
+            UPDATE maintenance_records
+            SET last_updated_time = ?,
+                updated_by        = ?,
+                updated_date      = ?
+            WHERE id = ?
+            """,
+            (now, username, now, record_id),
+        )
+
         return CsvResponse(
             headers=headers,
             rows=rows,
