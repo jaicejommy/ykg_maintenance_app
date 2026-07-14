@@ -238,6 +238,39 @@ async function deleteRecord(id) {
   return response.json();
 }
 
+/**
+ * Fetch deleted maintenance records (Administrator only).
+ * @returns {Promise<Array>}
+ */
+async function getDeletedRecords() {
+  const response = await fetch(`${API_BASE}/api/records?status=deleted`, {
+    method: "GET",
+    headers: buildAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    await throwResponseError(response);
+  }
+  return response.json();
+}
+
+/**
+ * Restore a soft-deleted record (Administrator only).
+ * @param {number} recordId
+ * @returns {Promise<object>}
+ */
+async function restoreRecord(recordId) {
+  const response = await fetch(`${API_BASE}/api/records/${recordId}/restore`, {
+    method: "PATCH",
+    headers: buildAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    await throwResponseError(response);
+  }
+  return response.json();
+}
+
 // ---------------------------------------------------------------------------
 // Attachments
 // ---------------------------------------------------------------------------
