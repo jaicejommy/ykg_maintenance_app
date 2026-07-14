@@ -53,33 +53,21 @@ function parseColumnSchema(rawHeader) {
         type = 'float';
     } else if (annotation === 'text') {
         type = 'text';
-    } else if (annotation.includes(':list')) {
+    } else if (annotation.endsWith(':list')) {
         type = 'list';
-        key = annotation.split(':')[0];
+        key = annotation.slice(0, -5).trim(); // <Key:list>
     } else if (annotation.startsWith('list:')) {
         type = 'list';
-        const remainder = annotation.substring(5).trim();
-        if (remainder.includes(',')) {
-            options = remainder.split(',').map(o => o.trim());
-        } else {
-            key = remainder; // <list:Key> support
-        }
-    } else if (annotation.includes(':variant')) {
+        options = annotation.substring(5).split(',').map(o => o.trim()); // <list:Opt1,Opt2>
+    } else if (annotation.endsWith(':variant')) {
         type = 'variant';
-        key = annotation.split(':')[0];
-    } else if (annotation.startsWith('variant:')) {
-        type = 'variant';
-        key = annotation.substring(8).trim(); // <variant:Key> support
-    } else if (annotation.includes(':DataType')) {
+        key = annotation.slice(0, -8).trim(); // <Key:variant>
+    } else if (annotation.endsWith(':DataType')) {
         type = 'meta';
-        key = annotation;
+        key = annotation; // <Key:DataType>
         hidden = true;
-    } else if (annotation.includes(':text')) {
+    } else {
         type = 'text';
-        key = annotation.split(':')[0];
-    } else if (annotation.startsWith('text:')) {
-        type = 'text';
-        key = annotation.substring(5).trim();
     }
     
     if (!label && key) {
