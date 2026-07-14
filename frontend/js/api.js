@@ -169,6 +169,8 @@ async function getRecords(filters = {}) {
   const params = new URLSearchParams();
   if (filters.type)   params.append("type",   filters.type);
   if (filters.search) params.append("search", filters.search);
+  if (filters.sortBy) params.append("sort_by", filters.sortBy);
+  if (filters.sortOrder) params.append("sort_order", filters.sortOrder);
 
   const qs = params.toString() ? `?${params.toString()}` : "";
   const response = await fetch(`${API_BASE}/api/records${qs}`, {
