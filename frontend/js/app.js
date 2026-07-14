@@ -359,44 +359,81 @@ function initDashboardPage() {
   // Full unfiltered records — loaded once on page load, filtered in memory
   let allRecords = [];
 
-  /**
-   * Re-apply all three dashboard filters to the in-memory allRecords array
-   * and re-render the table. No API call is made here.
-   */
-  function applyFilters() {
-    if (typeof window._dashboardClearSelection === "function") {
-      window._dashboardClearSelection();
-    }
-    const currentFilters = {
-      type:      typeFilter      ? typeFilter.value      : "",
-      category:  categoryFilter  ? categoryFilter.value  : "",
-      equipment: equipmentFilter ? equipmentFilter.value : "",
+  let _sortBy    = 'id';
+  let _sortOrder = 'desc';
+
+  function _getCurrentFilters() {
+    return {
+      type:       typeFilter      ? typeFilter.value      : "",
+      category:   categoryFilter  ? categoryFilter.value  : "",
+      equipment:  equipmentFilter ? equipmentFilter.value : "",
+      search:     searchInput     ? searchInput.value     : "",
+      sortBy:     _sortBy,
+      sortOrder:  _sortOrder,
     };
-    const filtered = applyDashboardFilters(allRecords, currentFilters);
-    renderRecordsTable(filtered, role, username);
-    attachRowClickListeners(role, username);
   }
 
-  // Load records function — fetches from API, stores in allRecords, applies filters
-  async function loadRecords() {
-    // Pass search text to the server so the API's own search still works;
-    // category / equipment are filtered client-side from the returned set.
-    const serverFilters = {
-      search: searchInput ? searchInput.value : "",
-    };
+  function _updateSortIndicators() {
+    document.querySelectorAll('th[data-sort-by]').forEach(th => {
+        const col       = th.getAttribute('data-sort-by');
+        const indicator = th.querySelector('.sort-indicator');
+        if (!indicator) return;
+
+        if (col === _sortBy) {
+            indicator.textContent = _sortOrder === 'asc' ? ' ▲' : ' ▼';
+            th.classList.add('sort-active');
+        } else {
+            indicator.textContent = '';
+            th.classList.remove('sort-active');
+        }
+    });
+  }
+
+  const thead = document.querySelector('#recordsTable thead');
+  if (thead) {
+      thead.addEventListener('click', async (e) => {
+          const th = e.target.closest('th[data-sort-by]');
+          if (!th) return;
+
+          if (typeof window._dashboardClearSelection === "function") {
+              window._dashboardClearSelection();
+          }
+
+          const column = th.getAttribute('data-sort-by');
+
+          if (_sortBy === column) {
+              // Same column — toggle direction
+              _sortOrder = _sortOrder === 'desc' ? 'asc' : 'desc';
+          } else {
+              // New column — default to ascending
+              _sortBy    = column;
+              _sortOrder = 'asc';
+          }
+
+          _updateSortIndicators();
+          await _fetchAndRenderRecords();
+      });
+  }
+
+  async function _fetchAndRenderRecords() {
     try {
-      const records = await getRecords(serverFilters);
+        const filters = _getCurrentFilters();
+        const data    = await getRecords(filters);
+        allRecords    = Array.isArray(data) ? data : (data.records || []);
+        
+        _recordsMap = {};
+        allRecords.forEach((r) => { _recordsMap[r.id] = r; });
 
-      // Store the full result set for client-side filter operations
-      allRecords = records;
+        if (typeof window._dashboardClearSelection === "function") {
+          window._dashboardClearSelection();
+        }
 
-      // Keep a local map for the row-click handler
-      _recordsMap = {};
-      records.forEach((r) => { _recordsMap[r.id] = r; });
-
-      applyFilters();
+        const filtered = applyDashboardFilters(allRecords, filters);
+        renderRecordsTable(filtered, role, username);
+        attachRowClickListeners(role, username);
+        _updateSortIndicators();
     } catch (err) {
-      showToast(err.message || "Failed to load records.", "error");
+        showToast(err.message || 'Failed to load records.', 'error');
     }
   }
 
@@ -405,26 +442,26 @@ function initDashboardPage() {
     let debounceTimer;
     searchInput.addEventListener("input", () => {
       clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(loadRecords, 350);
+      debounceTimer = setTimeout(_fetchAndRenderRecords, 350);
     });
   }
 
-  // Wire type filter — client-side, no API call
+  // Wire type filter — client-side + server-side
   if (typeFilter) {
-    typeFilter.addEventListener("change", applyFilters);
+    typeFilter.addEventListener("change", _fetchAndRenderRecords);
   }
 
-  // Wire category filter — client-side, no API call
+  // Wire category filter — client-side + server-side
   if (categoryFilter) {
-    categoryFilter.addEventListener("change", applyFilters);
+    categoryFilter.addEventListener("change", _fetchAndRenderRecords);
   }
 
-  // Wire equipment ID filter — client-side, no API call
+  // Wire equipment ID filter — client-side + server-side
   if (equipmentFilter) {
     let equipDebounce;
     equipmentFilter.addEventListener("input", () => {
       clearTimeout(equipDebounce);
-      equipDebounce = setTimeout(applyFilters, 200);
+      equipDebounce = setTimeout(_fetchAndRenderRecords, 200);
     });
   }
 
@@ -456,7 +493,7 @@ function initDashboardPage() {
         if (bsModal) bsModal.hide();
 
         // Reload to update stats
-        loadRecords();
+        _fetchAndRenderRecords();
       } catch (err) {
         showToast(err.message || "Failed to delete record.", "error");
       } finally {
@@ -468,7 +505,7 @@ function initDashboardPage() {
   }
 
   // Initial load
-  loadRecords().then(() => {
+  _fetchAndRenderRecords().then(() => {
     _initBulkActions();
   });
 }
