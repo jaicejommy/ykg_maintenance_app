@@ -96,68 +96,87 @@ function parseOptionsRow(row) {
 }
 
 function parseFullCsv(allRows) {
-    if (!Array.isArray(allRows) || allRows.length === 0) return null;
+    if (!Array.isArray(allRows) || allRows.length === 0) return [];
 
-    let title          = null;
-    let headerRowIndex = -1;
-    let schemaArray    = [];
-    const optionsMap   = {};
-    const sectionRows  = [];
-    const dataRows     = [];
+    const optionsMap = {};
+    const tables = [];
+    
+    // First pass: extract all options globally
+    allRows.forEach(row => {
+        if (classifyRow(row) === ROW_TYPES.OPTIONS) {
+            const parsed = parseOptionsRow(row);
+            if (parsed) optionsMap[parsed.key] = parsed.options;
+        }
+    });
+
+    let currentTable = null;
+
+    function finalizeCurrentTable() {
+        if (currentTable && currentTable.headerRowIndex !== -1 && currentTable.schemaArray.length > 0) {
+            currentTable.schemaArray.forEach(schema => {
+                if (schema.type === 'list' && schema.key && optionsMap[schema.key]) {
+                    schema.options = optionsMap[schema.key];
+                }
+            });
+
+            currentTable.visibleColIndexes = currentTable.schemaArray
+                .map((s, i) => i)
+                .filter(i => !currentTable.schemaArray[i].hidden);
+            currentTable.visibleSchema = currentTable.visibleColIndexes.map(i => currentTable.schemaArray[i]);
+
+            tables.push(currentTable);
+        }
+    }
 
     allRows.forEach((row, i) => {
         const type = classifyRow(row);
 
-        if (type === ROW_TYPES.TITLE && !title) {
+        if (type === ROW_TYPES.TITLE) {
+            finalizeCurrentTable();
+            currentTable = {
+                title: null,
+                headerRowIndex: -1,
+                schemaArray: [],
+                sectionRows: [],
+                dataRows: [],
+                optionsMap: optionsMap
+            };
             let extracted = (row[0] || '').replace(/^<[^>]+>\s*/, '').trim();
             if (!extracted) extracted = (row[1] || '').trim();
-            title = extracted || null;
+            currentTable.title = extracted || null;
         }
 
-        if (type === ROW_TYPES.HEADER && headerRowIndex === -1) {
-            headerRowIndex = i;
-            schemaArray    = row.map(parseColumnSchema);
+        if (type === ROW_TYPES.HEADER) {
+            if (!currentTable || currentTable.headerRowIndex !== -1) {
+                finalizeCurrentTable();
+                currentTable = {
+                    title: null,
+                    headerRowIndex: -1,
+                    schemaArray: [],
+                    sectionRows: [],
+                    dataRows: [],
+                    optionsMap: optionsMap
+                };
+            }
+            if (currentTable.headerRowIndex === -1) {
+                currentTable.headerRowIndex = i;
+                currentTable.schemaArray = row.map(parseColumnSchema);
+            }
         }
 
-        if (type === ROW_TYPES.OPTIONS) {
-            const parsed = parseOptionsRow(row);
-            if (parsed) optionsMap[parsed.key] = parsed.options;
-        }
-
-        if (type === ROW_TYPES.SECTION) {
+        if (type === ROW_TYPES.SECTION && currentTable) {
             let label = (row[0] || '').replace(/^<[^>]+>\s*/, '').trim();
             if (!label) label = (row[1] || '').trim();
-            sectionRows.push({ rowIndex: i, label });
+            currentTable.sectionRows.push({ rowIndex: i, label });
         }
 
-        if (type === ROW_TYPES.DATA) {
-            dataRows.push({ rowIndex: i, values: row.map(v => (v || '').trim()) });
-        }
-    });
-
-    if (headerRowIndex === -1 || schemaArray.length === 0) return null;
-
-    schemaArray.forEach(schema => {
-        if (schema.type === 'list' && schema.key && optionsMap[schema.key]) {
-            schema.options = optionsMap[schema.key];
+        if (type === ROW_TYPES.DATA && currentTable) {
+            currentTable.dataRows.push({ rowIndex: i, values: row.map(v => (v || '').trim()) });
         }
     });
 
-    const visibleColIndexes = schemaArray
-        .map((s, i) => i)
-        .filter(i => !schemaArray[i].hidden);
-    const visibleSchema = visibleColIndexes.map(i => schemaArray[i]);
-
-    return {
-        title,
-        headerRowIndex,
-        schemaArray,
-        visibleSchema,
-        visibleColIndexes,
-        sectionRows,
-        dataRows,
-        optionsMap,
-    };
+    finalizeCurrentTable();
+    return tables;
 }
 
 function resolveVariantType(dataTypeValue, optionsMap) {
@@ -225,16 +244,29 @@ function validateCellValue(value, schema, variantResolved) {
     return { valid: true, message: '' };
 }
 
-function rebuildAllRows(allRows, updatedDataRows, schemaArray) {
-    const result   = allRows.map(row => [...row]);
-    let   dataIdx  = 0;
-    const noColIdx = schemaArray.findIndex(s => s.type === 'no');
+function rebuildAllRows(allRows, updatedDataRows, tables) {
+    const result = allRows.map(row => [...row]);
+    let dataIdx = 0;
+
+    const rowToTableMap = {};
+    tables.forEach(table => {
+        table.dataRows.forEach(d => {
+            rowToTableMap[d.rowIndex] = table;
+        });
+    });
 
     result.forEach((row, i) => {
         if (classifyRow(row) !== ROW_TYPES.DATA) return;
         if (dataIdx >= updatedDataRows.length) return;
 
+        const currentTable = rowToTableMap[i];
+        if (!currentTable) return;
+
         const updatedValues = updatedDataRows[dataIdx];
+        const schemaArray = currentTable.schemaArray;
+        const noColIdx = schemaArray.findIndex(s => s.type === 'no');
+        const localDataIdx = currentTable.dataRows.findIndex(d => d.rowIndex === i);
+
         schemaArray.forEach((schema, colIndex) => {
             if (schema.type === 'no' || schema.type === 'readonly' || schema.type === 'meta') {
                 return;
@@ -244,8 +276,8 @@ function rebuildAllRows(allRows, updatedDataRows, schemaArray) {
             }
         });
 
-        if (noColIdx !== -1) {
-            result[i][noColIdx] = String(dataIdx + 1);
+        if (noColIdx !== -1 && localDataIdx !== -1) {
+            result[i][noColIdx] = String(localDataIdx + 1);
         }
 
         dataIdx++;
