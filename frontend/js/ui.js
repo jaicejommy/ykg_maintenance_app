@@ -819,11 +819,11 @@ function _buildTypedCell(value, schema, isEditable, variantResolved) {
     return td;
 }
 
-function renderCsvGrid(parsedCsv, isEditable) {
-    const wrapper   = document.createElement('div');
-    wrapper.className = 'checklist-wrapper';
+function renderCsvGrid(parsedCsvTables, isEditable) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'checklist-multi-wrapper';
 
-    if (!parsedCsv) {
+    if (!parsedCsvTables || parsedCsvTables.length === 0) {
         const msg = document.createElement('p');
         msg.className   = 'checklist-empty-msg';
         msg.textContent = 'No checklist uploaded for this record.';
@@ -831,111 +831,124 @@ function renderCsvGrid(parsedCsv, isEditable) {
         return wrapper;
     }
 
-    // Title
-    if (parsedCsv.title) {
-        const titleEl = document.createElement('div');
-        titleEl.className   = 'checklist-title';
-        titleEl.textContent = parsedCsv.title;
-        wrapper.appendChild(titleEl);
-    }
+    parsedCsvTables.forEach(parsedCsv => {
+        const tableWrapper = document.createElement('div');
+        tableWrapper.className = 'checklist-wrapper mb-4';
 
-    const tableScroll = document.createElement('div');
-    tableScroll.className = 'checklist-scroll';
-
-    const table = document.createElement('table');
-    table.className = 'table table-bordered table-sm checklist-table';
-
-    // THEAD — visible columns only, clean labels
-    const thead = document.createElement('thead');
-    const hRow  = document.createElement('tr');
-    parsedCsv.visibleSchema.forEach(schema => {
-        const th = document.createElement('th');
-        th.textContent = schema.label;
-        hRow.appendChild(th);
-    });
-    thead.appendChild(hRow);
-    table.appendChild(thead);
-
-    // TBODY — interleave section rows and data rows in original order
-    const tbody  = document.createElement('tbody');
-    const merged = [
-        ...parsedCsv.sectionRows.map(s => ({
-            order: s.rowIndex, type: 'section', label: s.label
-        })),
-        ...parsedCsv.dataRows.map((d, di) => ({
-            order: d.rowIndex, type: 'data', values: d.values, dataIndex: di
-        })),
-    ].sort((a, b) => a.order - b.order);
-
-    merged.forEach(item => {
-        if (item.type === 'section') {
-            const tr = document.createElement('tr');
-            tr.className = 'checklist-section-row';
-            const td = document.createElement('td');
-            td.setAttribute('colspan', String(parsedCsv.visibleSchema.length));
-            td.textContent = item.label;
-            tr.appendChild(td);
-            tbody.appendChild(tr);
-            return;
+        // Title
+        if (parsedCsv.title) {
+            const titleEl = document.createElement('div');
+            titleEl.className   = 'checklist-title';
+            titleEl.textContent = parsedCsv.title;
+            tableWrapper.appendChild(titleEl);
         }
 
-        // Data row
-        const tr = document.createElement('tr');
-        tr.setAttribute('data-data-index', String(item.dataIndex));
+        const tableScroll = document.createElement('div');
+        tableScroll.className = 'checklist-scroll';
 
-        parsedCsv.visibleColIndexes.forEach(colIndex => {
-            const schema = parsedCsv.schemaArray[colIndex];
-            const value  = item.values[colIndex] !== undefined ? item.values[colIndex] : '';
+        const table = document.createElement('table');
+        table.className = 'table table-bordered table-sm checklist-table mb-0';
 
-            // For variant columns: resolve per-row type using the meta column
-            let variantResolved = null;
-            if (schema.type === 'variant') {
-                const metaColIndex = parsedCsv.schemaArray.findIndex(
-                    s => s.type === 'meta' && s.key === schema.key + ':DataType'
-                );
-                const dataTypeValue = metaColIndex !== -1
-                    ? (item.values[metaColIndex] || '')
-                    : '';
-                variantResolved = window.csvSchema
-                    ? window.csvSchema.resolveVariantType(dataTypeValue, parsedCsv.optionsMap)
-                    : { type: 'text', options: null };
+        // THEAD — visible columns only, clean labels
+        const thead = document.createElement('thead');
+        const hRow  = document.createElement('tr');
+        parsedCsv.visibleSchema.forEach(schema => {
+            const th = document.createElement('th');
+            th.textContent = schema.label;
+            hRow.appendChild(th);
+        });
+        thead.appendChild(hRow);
+        table.appendChild(thead);
+
+        // TBODY — interleave section rows and data rows in original order
+        const tbody  = document.createElement('tbody');
+        const merged = [
+            ...parsedCsv.sectionRows.map(s => ({
+                order: s.rowIndex, type: 'section', label: s.label
+            })),
+            ...parsedCsv.dataRows.map(d => ({
+                order: d.rowIndex, type: 'data', values: d.values
+            })),
+        ].sort((a, b) => a.order - b.order);
+
+        merged.forEach(item => {
+            if (item.type === 'section') {
+                const tr = document.createElement('tr');
+                tr.className = 'checklist-section-row';
+                const td = document.createElement('td');
+                td.setAttribute('colspan', String(parsedCsv.visibleSchema.length));
+                td.textContent = item.label;
+                tr.appendChild(td);
+                tbody.appendChild(tr);
+                return;
             }
 
-            const td = _buildTypedCell(value, schema, isEditable, variantResolved);
-            td.setAttribute('data-col-index', String(colIndex));
-            tr.appendChild(td);
+            // Data row
+            const tr = document.createElement('tr');
+            tr.setAttribute('data-original-row-index', String(item.order));
+
+            parsedCsv.visibleColIndexes.forEach(colIndex => {
+                const schema = parsedCsv.schemaArray[colIndex];
+                const value  = item.values[colIndex] !== undefined ? item.values[colIndex] : '';
+
+                let variantResolved = null;
+                if (schema.type === 'variant') {
+                    const metaColIndex = parsedCsv.schemaArray.findIndex(
+                        s => s.type === 'meta' && s.key === schema.key + ':DataType'
+                    );
+                    const dataTypeValue = metaColIndex !== -1
+                        ? (item.values[metaColIndex] || '')
+                        : '';
+                    variantResolved = window.csvSchema
+                        ? window.csvSchema.resolveVariantType(dataTypeValue, parsedCsv.optionsMap)
+                        : { type: 'text', options: null };
+                }
+
+                const td = _buildTypedCell(value, schema, isEditable, variantResolved);
+                td.setAttribute('data-col-index', String(colIndex));
+                tr.appendChild(td);
+            });
+
+            tbody.appendChild(tr);
         });
 
-        tbody.appendChild(tr);
+        table.appendChild(tbody);
+        tableScroll.appendChild(table);
+        tableWrapper.appendChild(tableScroll);
+        wrapper.appendChild(tableWrapper);
     });
 
-    table.appendChild(tbody);
-    tableScroll.appendChild(table);
-    wrapper.appendChild(tableScroll);
     return wrapper;
 }
 
-function readCsvGridValues(tableEl, parsedCsv) {
+function readCsvGridValues(wrapperEl, parsedCsvTables) {
     const result = [];
-    if (!tableEl || !parsedCsv) return result;
+    if (!wrapperEl || !parsedCsvTables) return result;
 
-    tableEl.querySelectorAll('tbody tr[data-data-index]').forEach((tr) => {
-        const di = parseInt(tr.getAttribute('data-data-index'), 10);
-        // Start with original stored values (preserves hidden meta column values)
-        const original = parsedCsv.dataRows[di]
-            ? [...parsedCsv.dataRows[di].values]
-            : new Array(parsedCsv.schemaArray.length).fill('');
+    const rowMap = {};
+    parsedCsvTables.forEach(table => {
+        table.dataRows.forEach(d => {
+            rowMap[d.rowIndex] = { values: [...d.values], schemaArray: table.schemaArray };
+        });
+    });
 
-        // Override only the visible, editable cells from the DOM
+    wrapperEl.querySelectorAll('tbody tr[data-original-row-index]').forEach((tr) => {
+        const originalIndex = parseInt(tr.getAttribute('data-original-row-index'), 10);
+        const mapEntry = rowMap[originalIndex];
+        if (!mapEntry) return;
+
+        const original = [...mapEntry.values];
+        const schemaArray = mapEntry.schemaArray;
+
         tr.querySelectorAll('td[data-col-index]').forEach(td => {
             const colIndex = parseInt(td.getAttribute('data-col-index'), 10);
-            const schema   = parsedCsv.schemaArray[colIndex];
+            const schema = schemaArray[colIndex];
             if (!schema || schema.type === 'no' || schema.type === 'readonly' || schema.type === 'meta') {
-                return; // keep original value
+                return;
             }
-            const sel   = td.querySelector('select');
+            const sel = td.querySelector('select');
             const input = td.querySelector('input');
-            if (sel)   original[colIndex] = sel.value;
+            if (sel) original[colIndex] = sel.value;
             else if (input) original[colIndex] = input.value;
         });
 

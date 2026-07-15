@@ -1648,34 +1648,44 @@ async function initRecordDetailPage() {
           const updatedDataRows = readCsvGridValues(_checklistEl, _parsedCsv);
           
           let isValid = true;
-          for (let di = 0; di < updatedDataRows.length; di++) {
-              for (let ci = 0; ci < _parsedCsv.schemaArray.length; ci++) {
-                  const schema = _parsedCsv.schemaArray[ci];
-                  const value = updatedDataRows[di][ci];
-                  let variantResolved = null;
-                  if (schema.type === 'variant') {
-                      const metaColIndex = _parsedCsv.schemaArray.findIndex(
-                          s => s.type === 'meta' && s.key === schema.key + ':DataType'
-                      );
-                      const dataTypeValue = metaColIndex !== -1 ? (updatedDataRows[di][metaColIndex] || '') : '';
-                      variantResolved = window.csvSchema.resolveVariantType(dataTypeValue, _parsedCsv.optionsMap);
+          let dataIdx = 0;
+          
+          for (const table of _parsedCsv) {
+              for (let i = 0; i < table.dataRows.length; i++) {
+                  if (dataIdx >= updatedDataRows.length) break;
+                  const rowValues = updatedDataRows[dataIdx];
+                  const schemaArray = table.schemaArray;
+                  
+                  for (let ci = 0; ci < schemaArray.length; ci++) {
+                      const schema = schemaArray[ci];
+                      const value = rowValues[ci];
+                      let variantResolved = null;
+                      if (schema.type === 'variant') {
+                          const metaColIndex = schemaArray.findIndex(
+                              s => s.type === 'meta' && s.key === schema.key + ':DataType'
+                          );
+                          const dataTypeValue = metaColIndex !== -1 ? (rowValues[metaColIndex] || '') : '';
+                          variantResolved = window.csvSchema.resolveVariantType(dataTypeValue, table.optionsMap);
+                      }
+                      const result = window.csvSchema.validateCellValue(value, schema, variantResolved);
+                      if (!result.valid) {
+                          showToast(`Data Row ${dataIdx + 1}: ${result.message}`, "error");
+                          isValid = false;
+                          break;
+                      }
                   }
-                  const result = window.csvSchema.validateCellValue(value, schema, variantResolved);
-                  if (!result.valid) {
-                      showToast(`Row ${di + 1}: ${result.message}`, "error");
-                      isValid = false;
-                      break;
-                  }
+                  if (!isValid) break;
+                  dataIdx++;
               }
               if (!isValid) break;
           }
           if (!isValid) return;
 
-          const rebuiltRows = window.csvSchema.rebuildAllRows(_allRows, updatedDataRows, _parsedCsv.schemaArray);
+          const rebuiltRows = window.csvSchema.rebuildAllRows(_allRows, updatedDataRows, _parsedCsv);
 
           setLoading(btnSave, true);
           try {
-              await saveCsvData(recordId, { headers: _parsedCsv.schemaArray.map(s => s.rawHeader), rows: rebuiltRows });
+              await saveCsvData(recordId, { headers: [], rows: rebuiltRows });
               _allRows = rebuiltRows;
               _savedRows = JSON.parse(JSON.stringify(_allRows));
               _parsedCsv = window.csvSchema.parseFullCsv(_allRows);
