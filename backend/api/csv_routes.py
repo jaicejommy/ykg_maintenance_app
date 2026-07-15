@@ -179,24 +179,13 @@ async def upload_csv(
                 detail="CSV must contain at least one header row and one data row.",
             )
 
-        header_row = []
-        for row in all_rows:
-            if any(re.match(r'^<[^>]+>', cell.strip()) for cell in row):
-                first_cell = row[0].strip() if row else ""
-                if not (re.match(r'^<Table:\d+>', first_cell, re.IGNORECASE) or 
-                        re.match(r'^<Section:\d+>', first_cell, re.IGNORECASE) or 
-                        re.match(r'^<Options:\d+:[A-Za-z0-9]+>', first_cell, re.IGNORECASE)):
-                    header_row = row
-                    break
-        if not header_row:
-            header_row = all_rows[0]
-
         # --- Column count limit ---
-        if len(header_row) > MAX_CSV_COLUMNS:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"CSV may not exceed {MAX_CSV_COLUMNS} columns. Found {len(header_row)}.",
-            )
+        for r in all_rows:
+            if len(r) > MAX_CSV_COLUMNS:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"CSV rows may not exceed {MAX_CSV_COLUMNS} columns.",
+                )
 
         # --- Row count limit ---
         if len(all_rows) > MAX_CSV_ROWS:
@@ -206,7 +195,7 @@ async def upload_csv(
             )
 
         # --- Sanitize ---
-        headers = [_sanitize_cell(h) for h in header_row]
+        headers = [] # Obsolete, kept for backwards DB compatibility
         rows    = [[_sanitize_cell(cell) for cell in row] for row in all_rows]
 
         # --- Persist ---
