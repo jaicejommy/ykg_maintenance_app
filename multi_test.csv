@@ -1,0 +1,12 @@
+<Table:1>,Compressor Check,,,,
+<Options:1:Status>,OK,Not OK,,,
+<No>,<CheckItems> Instruction,<Status:list> Status,,,
+<Section:1>,General,,,,
+,Check oil,,,,
+,Check belt,,,,
+
+<Table:2>,Pressure Log,,,,
+<No>,<CheckItems> Point,<float> Value,<text> Unit,,
+<Section:1>,Readings,,,,
+,Stage 1 Pressure,,,psi,
+,Stage 2 Pressure,,,psi,
