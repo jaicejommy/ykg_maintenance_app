@@ -1682,9 +1682,9 @@ async function initRecordDetailPage() {
   if (headerEqpEl) headerEqpEl.textContent = record.equipment_id || "\u2014";
 
   // Show/hide Edit Record button
+  const canEdit = (role === ROLES.ADMIN) || (role === ROLES.ENGINEER && record.created_by === username);
   const editBtn = document.getElementById("detail-edit-btn");
   if (editBtn) {
-    const canEdit = (role === ROLES.ADMIN) || (role === ROLES.ENGINEER && record.created_by === username);
     if (canEdit) {
       editBtn.classList.remove("d-none");
       editBtn.setAttribute("href", `form.html?id=${recordId}`);
@@ -1704,8 +1704,8 @@ async function initRecordDetailPage() {
   let _isEditable       = false;
   let _hasUnsavedChanges = false;
 
-  async function _loadChecklist(recordId, userRole) {
-      _isEditable = (userRole === 'Administrator' || userRole === 'Engineer / Operator');
+  async function _loadChecklist(recordId, canEdit) {
+      _isEditable = canEdit;
 
       const gridWrapEl   = document.getElementById('csv-grid-container');
       const emptyStateEl = document.getElementById('csv-placeholder');
@@ -1762,7 +1762,7 @@ async function initRecordDetailPage() {
       if (undoBtn) undoBtn.disabled = false;
   }
 
-  await _loadChecklist(recordId, role);
+  await _loadChecklist(recordId, canEdit);
 
   const btnUpload   = document.getElementById("btn-csv-upload");
   const btnSave     = document.getElementById("btn-csv-save");
@@ -1770,11 +1770,11 @@ async function initRecordDetailPage() {
   const btnDownload = document.getElementById("btn-csv-download");
   const csvFileInput = document.getElementById("csvFileInput");
 
-  if (role !== ROLES.VIEWER && btnUpload) {
+  if (canEdit && btnUpload) {
       btnUpload.classList.remove("d-none");
   }
-  if (role !== ROLES.VIEWER && btnSave) btnSave.classList.remove("d-none");
-  if (role !== ROLES.VIEWER && btnUndo) btnUndo.classList.remove("d-none");
+  if (canEdit && btnSave) btnSave.classList.remove("d-none");
+  if (canEdit && btnUndo) btnUndo.classList.remove("d-none");
 
   if (btnUpload && csvFileInput) {
       btnUpload.addEventListener("click", () => csvFileInput.click());
