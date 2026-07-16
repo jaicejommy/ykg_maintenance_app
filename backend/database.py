@@ -116,12 +116,19 @@ def init_db() -> None:
         )
         conn.execute(
             """
-            CREATE TABLE IF NOT EXISTS equipment (
-                id            INTEGER PRIMARY KEY AUTOINCREMENT,
-                code          TEXT    NOT NULL UNIQUE,
-                name          TEXT    NOT NULL,
-                category      TEXT    NOT NULL,
-                is_active     INTEGER NOT NULL DEFAULT 1
+            CREATE TABLE IF NOT EXISTS equipment_hierarchy (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                enterprise_name TEXT    NOT NULL,
+                site            TEXT    NOT NULL,
+                area            TEXT    NOT NULL,
+                work_center     TEXT    NOT NULL,
+                work_unit       TEXT    NOT NULL,
+                equipment_id    TEXT    NOT NULL,
+                full_path       TEXT    NOT NULL,
+                is_active       INTEGER NOT NULL DEFAULT 1,
+                created_by      TEXT    NOT NULL,
+                created_date    TEXT    NOT NULL,
+                UNIQUE(enterprise_name, site, area, work_center, work_unit, equipment_id)
             )
             """
         )
@@ -130,7 +137,7 @@ def init_db() -> None:
     finally:
         conn.close()
 
-    seed_equipment()
+
 
     # Migrate existing databases — add new columns if absent.
     # The old date_time column is intentionally left on existing installations
@@ -140,90 +147,11 @@ def init_db() -> None:
     add_column_if_not_exists("maintenance_records", "planned_start", "TEXT")
     add_column_if_not_exists("maintenance_records", "planned_end", "TEXT")
     add_column_if_not_exists("maintenance_records", "last_updated_time", "TEXT")
+    add_column_if_not_exists("maintenance_records", "equipment_full_path", "TEXT")
 
     # One-time data migration: copy legacy single-attachment data to record_attachments.
     _run_attachment_migration_v1()
 
-
-# ---------------------------------------------------------------------------
-# Equipment seed data
-# ---------------------------------------------------------------------------
-
-def seed_equipment() -> None:
-    """Insert the canonical equipment list if the equipment table is empty.
-
-    Idempotent: checks for existing rows before inserting and skips entirely
-    if any rows are present. Safe to call on every startup.
-    """
-    existing = fetch_one("SELECT COUNT(*) as count FROM equipment", ())
-    if existing and existing["count"] > 0:
-        logger.info("Equipment table already seeded — skipping.")
-        return
-
-    equipment_seed = [
-        # FIC series
-        ("FIC-100", "FIC-100", "FIC"),
-        ("FIC-101", "FIC-101", "FIC"),
-        ("FIC-102", "FIC-102", "FIC"),
-        ("FIC-103", "FIC-103", "FIC"),
-        ("FIC-104", "FIC-104", "FIC"),
-        ("FIC-105", "FIC-105", "FIC"),
-        ("FIC-106", "FIC-106", "FIC"),
-        ("FIC-107", "FIC-107", "FIC"),
-        ("FIC-108", "FIC-108", "FIC"),
-        ("FIC-109", "FIC-109", "FIC"),
-        ("FIC-110", "FIC-110", "FIC"),
-        ("FIC-111", "FIC-111", "FIC"),
-        ("FIC-112", "FIC-112", "FIC"),
-        ("FIC-113", "FIC-113", "FIC"),
-        ("FIC-114", "FIC-114", "FIC"),
-        ("FIC-115", "FIC-115", "FIC"),
-        ("FIC-116", "FIC-116", "FIC"),
-        ("FIC-117", "FIC-117", "FIC"),
-        ("FIC-118", "FIC-118", "FIC"),
-        ("FIC-119", "FIC-119", "FIC"),
-        ("FIC-120", "FIC-120", "FIC"),
-        # ROS series
-        ("ROS-100", "ROS-100", "ROS"),
-        ("ROS-101", "ROS-101", "ROS"),
-        ("ROS-102", "ROS-102", "ROS"),
-        ("ROS-103", "ROS-103", "ROS"),
-        ("ROS-104", "ROS-104", "ROS"),
-        ("ROS-105", "ROS-105", "ROS"),
-        ("ROS-106", "ROS-106", "ROS"),
-        ("ROS-107", "ROS-107", "ROS"),
-        ("ROS-108", "ROS-108", "ROS"),
-        ("ROS-109", "ROS-109", "ROS"),
-        ("ROS-110", "ROS-110", "ROS"),
-        # KYC series
-        ("KYC-100", "KYC-100", "KYC"),
-        ("KYC-101", "KYC-101", "KYC"),
-        ("KYC-102", "KYC-102", "KYC"),
-        ("KYC-103", "KYC-103", "KYC"),
-        ("KYC-104", "KYC-104", "KYC"),
-        ("KYC-105", "KYC-105", "KYC"),
-        ("KYC-106", "KYC-106", "KYC"),
-        ("KYC-107", "KYC-107", "KYC"),
-        ("KYC-108", "KYC-108", "KYC"),
-        ("KYC-109", "KYC-109", "KYC"),
-        ("KYC-110", "KYC-110", "KYC"),
-        ("KYC-111", "KYC-111", "KYC"),
-        ("KYC-112", "KYC-112", "KYC"),
-        ("KYC-113", "KYC-113", "KYC"),
-        ("KYC-114", "KYC-114", "KYC"),
-        ("KYC-115", "KYC-115", "KYC"),
-        ("KYC-116", "KYC-116", "KYC"),
-        ("KYC-117", "KYC-117", "KYC"),
-        ("KYC-118", "KYC-118", "KYC"),
-        ("KYC-119", "KYC-119", "KYC"),
-        ("KYC-120", "KYC-120", "KYC"),
-    ]
-    for code, name, category in equipment_seed:
-        execute(
-            "INSERT INTO equipment (code, name, category) VALUES (?, ?, ?)",
-            (code, name, category),
-        )
-    logger.info("Equipment table seeded with %d entries.", len(equipment_seed))
 
 
 # ---------------------------------------------------------------------------
