@@ -342,12 +342,13 @@ function _createPaginator({ containerId, pageSize: initialPageSize = 25, onRende
     const total      = _allItems.length;
     const totalPages = _totalPages();
 
-    if (total === 0 || totalPages <= 1) {
+    if (total === 0) {
       container.style.display = 'none';
       return;
     }
 
     container.style.display = 'flex';
+
 
     // "Showing X–Y of Z"
     const rangeStart = (_page - 1) * _pageSize + 1;
@@ -561,10 +562,10 @@ function initDashboardPage() {
       });
   }
 
-  // Paginator for the maintenance records table — 25 rows per page by default.
+  // Paginator for the maintenance records table — 10 rows per page by default.
   const dashPaginator = _createPaginator({
     containerId: 'dashboard-pagination',
-    pageSize:    25,
+    pageSize:    10,
     onRender(pageItems, allItems) {
       // Render only the current page's rows into the table
       renderRecordsTable(pageItems, role, username);
@@ -2128,14 +2129,14 @@ async function initEquipmentMasterPage() {
   const searchInput    = document.getElementById("equipment-search-input");
   const activeCheckbox = document.getElementById("equipment-active-only");
 
-  // Paginator for the equipment list — 25 rows per page by default.
+  // Paginator for the equipment list — 10 rows per page by default.
   // onRender references _onToggleEquipment and _onDeleteEquipment, which are
   // declared as consts below. They are only invoked when buttons are clicked
   // (after all consts in this scope are fully initialised), so the
   // temporal-dead-zone ordering is safe.
   const eqPaginator = _createPaginator({
     containerId: 'equipment-pagination',
-    pageSize:    25,
+    pageSize:    10,
     onRender(pageItems, allItems) {
       const emptyEl  = document.getElementById('equipment-empty-state');
       const oldTbody = document.getElementById('equipment-master-tbody');
