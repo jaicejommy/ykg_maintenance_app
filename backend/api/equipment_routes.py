@@ -7,9 +7,9 @@ import sqlite3
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 
 from backend.auth import get_current_user, require_role
-from backend.database import fetch_all, fetch_one, execute
+from backend.database import fetch_all, fetch_one, execute, get_connection
 from backend.models.equipment_models import EquipmentCreate, EquipmentUpdate, EquipmentOut
-from backend.constants import ROLES, MAX_BULK_EQUIPMENT_ROWS, MAX_BULK_EQUIPMENT_FILE_MB
+from backend.constants import ROLES, MAX_BULK_EQUIPMENT_ROWS, MAX_BULK_EQUIPMENT_FILE_MB, ALLOWED_EQUIPMENT_SORT_COLUMNS
 
 logger = logging.getLogger(__name__)
 
@@ -34,10 +34,17 @@ def _row_to_equipment_out(row) -> EquipmentOut:
 async def list_equipment(
     search: Optional[str] = None,
     active_only: bool = True,
+    sort_by: str = "enterprise_name",
+    sort_order: str = "asc",
     current_user: dict = Depends(get_current_user),
 ) -> List[EquipmentOut]:
     """Return equipment matching search and active_only filters."""
     try:
+        if sort_by not in ALLOWED_EQUIPMENT_SORT_COLUMNS:
+            raise HTTPException(status_code=400, detail="Invalid sort_by column.")
+        if sort_order not in ("asc", "desc"):
+            raise HTTPException(status_code=400, detail="sort_order must be 'asc' or 'desc'.")
+
         conditions: list[str] = []
         params: list = []
 
@@ -50,12 +57,18 @@ async def list_equipment(
             params.append(f"%{search}%")
 
         where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+
+        if sort_by == "enterprise_name":
+            order_clause = f"ORDER BY enterprise_name {sort_order.upper()}, site ASC, area ASC, work_center ASC, work_unit ASC, equipment_id ASC"
+        else:
+            order_clause = f"ORDER BY {sort_by} {sort_order.upper()}, id ASC"
+
         query = f"""
             SELECT id, enterprise_name, site, area, work_center, work_unit, equipment_id, 
                    full_path, is_active, created_by, created_date 
             FROM equipment_hierarchy 
             {where} 
-            ORDER BY enterprise_name ASC, site ASC, area ASC, work_center ASC, work_unit ASC, equipment_id ASC
+            {order_clause}
         """
         
         rows = fetch_all(query, tuple(params))
@@ -240,29 +253,34 @@ async def bulk_upload_equipment(
         skipped  = 0
         now      = datetime.utcnow().isoformat()
 
-        for row in data_rows:
-            ename  = row['enterprise_name'].strip()
-            site   = row['site'].strip()
-            area   = row['area'].strip()
-            wc     = row['work_center'].strip()
-            wu     = row['work_unit'].strip()
-            eq_id  = row['equipment_id'].strip()
-            path   = f"{ename} > {site} > {area} > {wc} > {wu} > {eq_id}"
+        conn = get_connection()
+        try:
+            for row in data_rows:
+                ename  = row['enterprise_name'].strip()
+                site   = row['site'].strip()
+                area   = row['area'].strip()
+                wc     = row['work_center'].strip()
+                wu     = row['work_unit'].strip()
+                eq_id  = row['equipment_id'].strip()
+                path   = f"{ename} > {site} > {area} > {wc} > {wu} > {eq_id}"
 
-            try:
-                execute(
-                    """
-                    INSERT INTO equipment_hierarchy
-                           (enterprise_name, site, area, work_center, work_unit,
-                            equipment_id, full_path, is_active, created_by, created_date)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
-                    """,
-                    (ename, site, area, wc, wu, eq_id, path,
-                     current_user["sub"], now)
-                )
-                inserted += 1
-            except sqlite3.IntegrityError:
-                skipped += 1
+                try:
+                    conn.execute(
+                        """
+                        INSERT INTO equipment_hierarchy
+                               (enterprise_name, site, area, work_center, work_unit,
+                                equipment_id, full_path, is_active, created_by, created_date)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                        """,
+                        (ename, site, area, wc, wu, eq_id, path,
+                         current_user["sub"], now)
+                    )
+                    inserted += 1
+                except sqlite3.IntegrityError:
+                    skipped += 1
+            conn.commit()
+        finally:
+            conn.close()
 
         return {
             "detail":   f"Upload complete. {inserted} equipment(s) added, {skipped} duplicate(s) skipped.",

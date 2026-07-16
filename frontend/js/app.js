@@ -2129,6 +2129,46 @@ async function initEquipmentMasterPage() {
   const searchInput    = document.getElementById("equipment-search-input");
   const activeCheckbox = document.getElementById("equipment-active-only");
 
+  // Sort state
+  let _eqSortBy    = 'enterprise_name';
+  let _eqSortOrder = 'asc';
+
+  function _updateEqSortIndicators() {
+    document.querySelectorAll('.records-table th[data-sort-by]').forEach(th => {
+        const col       = th.getAttribute('data-sort-by');
+        const indicator = th.querySelector('.sort-indicator');
+        if (!indicator) return;
+
+        if (col === _eqSortBy) {
+            indicator.textContent = _eqSortOrder === 'asc' ? ' ▲' : ' ▼';
+            th.classList.add('sort-active');
+        } else {
+            indicator.textContent = '';
+            th.classList.remove('sort-active');
+        }
+    });
+  }
+
+  const eqThead = document.querySelector('.records-table thead');
+  if (eqThead) {
+      eqThead.addEventListener('click', async (e) => {
+          const th = e.target.closest('th[data-sort-by]');
+          if (!th) return;
+
+          const column = th.getAttribute('data-sort-by');
+
+          if (_eqSortBy === column) {
+              _eqSortOrder = _eqSortOrder === 'desc' ? 'asc' : 'desc';
+          } else {
+              _eqSortBy    = column;
+              _eqSortOrder = 'asc';
+          }
+
+          _updateEqSortIndicators();
+          await _fetchAndRenderEquipment();
+      });
+  }
+
   // Paginator for the equipment list — 10 rows per page by default.
   // onRender references _onToggleEquipment and _onDeleteEquipment, which are
   // declared as consts below. They are only invoked when buttons are clicked
@@ -2199,7 +2239,7 @@ async function initEquipmentMasterPage() {
       const search     = searchInput     ? searchInput.value.trim() : '';
       const activeOnly = activeCheckbox  ? activeCheckbox.checked   : true;
 
-      const equipmentList = await getEquipmentList(search, activeOnly);
+      const equipmentList = await getEquipmentList(search, activeOnly, _eqSortBy, _eqSortOrder);
       eqPaginator.setData(equipmentList);
       eqPaginator.render();
     } catch (err) {
@@ -2214,6 +2254,9 @@ async function initEquipmentMasterPage() {
       debounceTimer = setTimeout(_fetchAndRenderEquipment, 300);
     });
   }
+
+  // Initial call to set correct indicators
+  _updateEqSortIndicators();
 
   if (activeCheckbox) {
     activeCheckbox.addEventListener("change", _fetchAndRenderEquipment);

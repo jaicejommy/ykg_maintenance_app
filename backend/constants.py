@@ -33,6 +33,17 @@ ALLOWED_SORT_COLUMNS = {
     "responsible_person",
 }
 
+ALLOWED_EQUIPMENT_SORT_COLUMNS = {
+    "id",
+    "enterprise_name",
+    "site",
+    "area",
+    "work_center",
+    "work_unit",
+    "equipment_id",
+    "is_active",
+}
+
 
 # ---------------------------------------------------------------------------
 # File upload constraints

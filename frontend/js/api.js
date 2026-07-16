@@ -477,10 +477,12 @@ async function downloadCsv(recordId) {
  * @param {boolean} activeOnly
  * @returns {Promise<Array>}
  */
-async function getEquipmentList(search = '', activeOnly = true) {
+async function getEquipmentList(search = '', activeOnly = true, sortBy = 'enterprise_name', sortOrder = 'asc') {
   const params = new URLSearchParams();
   if (search) params.append("search", search);
   params.append("active_only", activeOnly.toString());
+  if (sortBy) params.append("sort_by", sortBy);
+  if (sortOrder) params.append("sort_order", sortOrder);
 
   const response = await fetch(`${API_BASE}/api/equipment?${params.toString()}`, {
     method: "GET",
