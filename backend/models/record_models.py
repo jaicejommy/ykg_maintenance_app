@@ -43,6 +43,7 @@ class RecordCreate(BaseModel):
 
     maintenance_type: str
     equipment_id: str
+    equipment_full_path: str
     responsible_person: str
     planned_start: Optional[str] = None
     planned_end: Optional[str] = None
@@ -205,6 +206,7 @@ class RecordOut(BaseModel):
     maintenance_type: str
     created_time: str
     equipment_id: str
+    equipment_full_path: Optional[str] = None
     operating_conditions: Optional[str] = None
     inventory_consumables: Optional[str] = None
     responsible_person: str
