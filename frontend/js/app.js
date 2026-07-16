@@ -317,11 +317,10 @@ function applyDashboardFilters(records, filters) {
   return records.filter((record) => {
     const typeMatch = !filters.type ||
       record.maintenance_type === filters.type;
-    const categoryMatch = !filters.category ||
-      record.equipment_id.startsWith(filters.category);
     const equipmentMatch = !filters.equipment ||
-      record.equipment_id.toLowerCase().includes(filters.equipment.toLowerCase());
-    return typeMatch && categoryMatch && equipmentMatch;
+      (record.equipment_id || '').toLowerCase().includes(filters.equipment.toLowerCase()) ||
+      (record.equipment_full_path || '').toLowerCase().includes(filters.equipment.toLowerCase());
+    return typeMatch && equipmentMatch;
   });
 }
 
@@ -339,6 +338,7 @@ function initDashboardPage() {
   // Sidebar wiring
   populateSidebar();
   populateTopbarMeta();
+
   const activeDash = document.getElementById("nav-dashboard");
   if (activeDash) activeDash.classList.add("active");
 
@@ -353,7 +353,6 @@ function initDashboardPage() {
 
   const searchInput    = document.getElementById("search-input");
   const typeFilter     = document.getElementById("type-filter");
-  const categoryFilter = document.getElementById("categoryFilter");
   const equipmentFilter = document.getElementById("equipmentFilter");
 
   // Full unfiltered records — loaded once on page load, filtered in memory
@@ -365,7 +364,6 @@ function initDashboardPage() {
   function _getCurrentFilters() {
     return {
       type:       typeFilter      ? typeFilter.value      : "",
-      category:   categoryFilter  ? categoryFilter.value  : "",
       equipment:  equipmentFilter ? equipmentFilter.value : "",
       search:     searchInput     ? searchInput.value     : "",
       sortBy:     _sortBy,
@@ -451,10 +449,6 @@ function initDashboardPage() {
     typeFilter.addEventListener("change", _fetchAndRenderRecords);
   }
 
-  // Wire category filter — client-side + server-side
-  if (categoryFilter) {
-    categoryFilter.addEventListener("change", _fetchAndRenderRecords);
-  }
 
   // Wire equipment ID filter — client-side + server-side
   if (equipmentFilter) {
@@ -786,6 +780,7 @@ async function initFormPage() {
   // Sidebar wiring
   populateSidebar();
   populateTopbarMeta();
+
   const activeForm = document.getElementById("nav-new-record");
   if (activeForm) activeForm.classList.add("active");
 
@@ -954,6 +949,7 @@ async function initFormPage() {
     });
   }
 
+
   // DOM references for the searchable equipment dropdown
   const equipmentSearchEl = document.getElementById("equipmentSearch");
   const equipmentIdEl     = document.getElementById("equipmentId");
@@ -962,7 +958,7 @@ async function initFormPage() {
   // Fetch the active equipment list and initialise the dropdown
   let equipmentList = [];
   try {
-    equipmentList = await getEquipment();
+    equipmentList = await getEquipmentList("", true);
   } catch (err) {
     showToast(err.message || "Failed to load equipment list.", "error");
   }
@@ -976,8 +972,10 @@ async function initFormPage() {
       editRecord = records.find((r) => r.id === editId) || null;
       if (editRecord) {
         populateForm(editRecord);
+
         // Pre-populate the searchable equipment dropdown with the stored value
         setEquipmentDropdownValue(equipmentList, editRecord.equipment_id, equipmentSearchEl, equipmentIdEl);
+
         // Render existing attachments list (replaces old single-attachment block)
         await renderExistingAttachments(editId);
       } else {
@@ -1062,6 +1060,7 @@ async function initFormPage() {
     const maintenanceType      = document.getElementById("field-maintenance-type")?.value;
     // Read the hidden input value — set only when the user explicitly clicks a list item
     const equipmentId          = document.getElementById("equipmentId")?.value ?? "";
+    const equipmentFullPath    = document.getElementById("equipmentSearch")?.value ?? "";
     const responsiblePerson    = document.getElementById("field-responsible-person")?.value ?? "";
     const plannedStart         = document.getElementById("field-planned-start")?.value ?? "";
     const plannedEnd           = document.getElementById("field-planned-end")?.value ?? "";
@@ -1122,6 +1121,7 @@ async function initFormPage() {
     const formData = new FormData();
     formData.append("maintenance_type",   maintenanceType);
     formData.append("equipment_id",       equipmentId.trim());
+    formData.append("equipment_full_path", equipmentFullPath.trim());
     formData.append("responsible_person", responsiblePerson.trim());
     if (plannedStart)          formData.append("planned_start",          plannedStart);
     if (plannedEnd)            formData.append("planned_end",            plannedEnd);
@@ -1181,6 +1181,7 @@ async function initManageUsersPage() {
   // Sidebar wiring
   populateSidebar();
   populateTopbarMeta();
+
   const activeManage = document.getElementById("nav-manage-users");
   if (activeManage) activeManage.classList.add("active");
 
@@ -1464,6 +1465,7 @@ async function initRecordDetailPage() {
   // Sidebar wiring
   populateSidebar();
   populateTopbarMeta();
+
   // No specific nav item is active on the detail page (it's a drill-down)
 
   const role     = getRole();
@@ -1793,7 +1795,7 @@ function _populateDetailFields(record) {
 
   set("detail-id",                    record.id);
   set("detail-maintenance-type",      record.maintenance_type);
-  set("detail-equipment-id",          record.equipment_id);
+  set("detail-equipment-id", record.equipment_full_path || record.equipment_id);
   set("detail-responsible-person",    record.responsible_person);
   set("detail-operating-conditions",  record.operating_conditions);
   set("detail-inventory-consumables", record.inventory_consumables);
@@ -1927,6 +1929,168 @@ function _hideCsvPlaceholder() {
 }
 
 // ---------------------------------------------------------------------------
+// EQUIPMENT MASTER PAGE
+// ---------------------------------------------------------------------------
+
+async function initEquipmentMasterPage() {
+  const tbody = document.getElementById("equipment-master-tbody");
+  if (!tbody) return;
+
+  guardPage();
+  populateNavbar();
+  applyNavbarRoleVisibility();
+  populateSidebar();
+  populateTopbarMeta();
+  const activeMaster = document.getElementById("nav-equipment-master");
+  if (activeMaster) activeMaster.classList.add("active");
+
+  const role = getRole();
+  const isAdmin = role === ROLES.ADMIN;
+
+  const btnAdd = document.getElementById("btn-add-equipment");
+  const actionsTh = document.getElementById("equipment-actions-th");
+
+  if (isAdmin) {
+    if (btnAdd) btnAdd.classList.remove("d-none");
+    if (actionsTh) actionsTh.classList.remove("d-none");
+  } else {
+    if (actionsTh) actionsTh.classList.add("d-none");
+  }
+
+  const searchInput = document.getElementById("equipment-search-input");
+  const activeCheckbox = document.getElementById("equipment-active-only");
+
+  async function _fetchAndRenderEquipment() {
+    try {
+      const search = searchInput ? searchInput.value.trim() : "";
+      const activeOnly = activeCheckbox ? activeCheckbox.checked : true;
+
+      const equipmentList = await getEquipmentList(search, activeOnly);
+      
+      const newTbody = renderEquipmentMasterTable(
+        equipmentList,
+        getUsername(),
+        isAdmin,
+        async (eq) => { // Toggle
+          try {
+            await updateEquipment(eq.id, { is_active: !eq.is_active });
+            showToast(`Equipment ${eq.equipment_id} ${eq.is_active ? 'deactivated' : 'activated'}.`, "success");
+            _fetchAndRenderEquipment();
+          } catch (err) {
+            showToast(err.message || "Failed to update equipment.", "error");
+          }
+        },
+        async (eq) => { // Delete
+          openTypeToConfirmModal({
+            title: "Delete Equipment",
+            message: `Are you sure you want to permanently delete equipment ID "${eq.equipment_id}"? This cannot be undone.`,
+            confirmTargetText: eq.equipment_id,
+            confirmButtonLabel: "Delete Equipment",
+            onConfirmed: async () => {
+              try {
+                await deleteEquipment(eq.id);
+                showToast(`Equipment ${eq.equipment_id} deleted.`, "success");
+                _fetchAndRenderEquipment();
+              } catch (err) {
+                showToast(err.message || "Failed to delete equipment.", "error");
+              }
+            }
+          });
+        }
+      );
+      
+      const oldTbody = document.getElementById("equipment-master-tbody");
+      if (oldTbody) {
+        newTbody.id = "equipment-master-tbody";
+        oldTbody.parentNode.replaceChild(newTbody, oldTbody);
+      }
+      
+    } catch (err) {
+      showToast(err.message || "Failed to load equipment.", "error");
+    }
+  }
+
+  if (searchInput) {
+    let debounceTimer;
+    searchInput.addEventListener("input", () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(_fetchAndRenderEquipment, 300);
+    });
+  }
+
+  if (activeCheckbox) {
+    activeCheckbox.addEventListener("change", _fetchAndRenderEquipment);
+  }
+
+  if (btnAdd && isAdmin) {
+    const addModalEl = document.getElementById("addEquipmentModal");
+    const saveBtn = document.getElementById("btn-save-equipment");
+    
+    btnAdd.addEventListener("click", () => {
+      // Clear form
+      document.getElementById("add-equipment-form").reset();
+      clearFieldErrors();
+      new bootstrap.Modal(addModalEl).show();
+    });
+
+    if (saveBtn) {
+      saveBtn.addEventListener("click", async () => {
+        clearFieldErrors();
+        
+        const enterprise = document.getElementById("eq-enterprise").value.trim();
+        const site = document.getElementById("eq-site").value.trim();
+        const area = document.getElementById("eq-area").value.trim();
+        const workCenter = document.getElementById("eq-work-center").value.trim();
+        const workUnit = document.getElementById("eq-work-unit").value.trim();
+        const equipmentId = document.getElementById("eq-id").value.trim();
+
+        const validations = [
+          { fieldId: "eq-enterprise", result: validateRequired(enterprise, "Enterprise") },
+          { fieldId: "eq-site", result: validateRequired(site, "Site") },
+          { fieldId: "eq-area", result: validateRequired(area, "Area") },
+          { fieldId: "eq-work-center", result: validateRequired(workCenter, "Work Center") },
+          { fieldId: "eq-work-unit", result: validateRequired(workUnit, "Work Unit") },
+          { fieldId: "eq-id", result: validateRequired(equipmentId, "Equipment ID") }
+        ];
+
+        let hasErrors = false;
+        validations.forEach(({ fieldId, result }) => {
+          if (!result.valid) {
+            showFieldError(fieldId, result.message);
+            hasErrors = true;
+          }
+        });
+
+        if (hasErrors) return;
+
+        setLoading(saveBtn, true);
+        try {
+          await createEquipment({
+            enterprise_name: enterprise,
+            site: site,
+            area: area,
+            work_center: workCenter,
+            work_unit: workUnit,
+            equipment_id: equipmentId
+          });
+          
+          bootstrap.Modal.getInstance(addModalEl).hide();
+          showToast("Equipment added successfully.", "success");
+          _fetchAndRenderEquipment();
+        } catch (err) {
+          showToast(err.message || "Failed to add equipment.", "error");
+        } finally {
+          setLoading(saveBtn, false);
+        }
+      });
+    }
+  }
+
+  // Initial load
+  _fetchAndRenderEquipment();
+}
+
+// ---------------------------------------------------------------------------
 // Bootstrap — auto-detect and initialize the correct page
 // ---------------------------------------------------------------------------
 
@@ -1936,6 +2100,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initFormPage();
   initManageUsersPage();
   initRecordDetailPage();
+  initEquipmentMasterPage();
   if (document.getElementById('trashPage')) initTrashPage();
 });
 
@@ -2070,3 +2235,5 @@ function _openRestoreConfirm(record) {
 
     new bootstrap.Modal(modal).show();
 }
+
+
