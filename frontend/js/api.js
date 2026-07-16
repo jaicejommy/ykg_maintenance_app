@@ -27,7 +27,12 @@ async function throwResponseError(response) {
   try {
     const body = await response.json();
     if (body && body.detail) {
-      detail = body.detail;
+      if (Array.isArray(body.detail)) {
+        // Pydantic validation error array
+        detail = body.detail.map(e => e.msg).join(", ");
+      } else {
+        detail = body.detail;
+      }
     }
   } catch (_) {
     // JSON parse failed — use the default status text
@@ -468,15 +473,77 @@ async function downloadCsv(recordId) {
 
 /**
  * Fetch the active equipment list from the master table.
- * @param {{ category?: string, active_only?: boolean }} params
+ * @param {string} search
+ * @param {boolean} activeOnly
  * @returns {Promise<Array>}
  */
-async function getEquipment(params = {}) {
-  const query = Object.keys(params).length
-    ? "?" + new URLSearchParams(params).toString()
-    : "";
-  const response = await fetch(`${API_BASE}/api/equipment${query}`, {
+async function getEquipmentList(search = '', activeOnly = true) {
+  const params = new URLSearchParams();
+  if (search) params.append("search", search);
+  params.append("active_only", activeOnly.toString());
+
+  const response = await fetch(`${API_BASE}/api/equipment?${params.toString()}`, {
     method: "GET",
+    headers: buildAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    await throwResponseError(response);
+  }
+  return response.json();
+}
+
+/**
+ * Create a new equipment in the master hierarchy.
+ * @param {object} data
+ * @returns {Promise<object>}
+ */
+async function createEquipment(data) {
+  const response = await fetch(`${API_BASE}/api/equipment`, {
+    method: "POST",
+    headers: {
+      ...buildAuthHeaders(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    await throwResponseError(response);
+  }
+  return response.json();
+}
+
+/**
+ * Update an existing equipment (e.g. toggle active status).
+ * @param {number} id
+ * @param {object} data
+ * @returns {Promise<object>}
+ */
+async function updateEquipment(id, data) {
+  const response = await fetch(`${API_BASE}/api/equipment/${id}`, {
+    method: "PUT",
+    headers: {
+      ...buildAuthHeaders(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    await throwResponseError(response);
+  }
+  return response.json();
+}
+
+/**
+ * Delete an equipment from the master hierarchy.
+ * @param {number} id
+ * @returns {Promise<object>}
+ */
+async function deleteEquipment(id) {
+  const response = await fetch(`${API_BASE}/api/equipment/${id}`, {
+    method: "DELETE",
     headers: buildAuthHeaders(),
   });
 
