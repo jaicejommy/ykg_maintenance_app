@@ -91,7 +91,7 @@ async def get_csv_data(
         _get_active_record(record_id)
 
         csv_row = fetch_one(
-            "SELECT headers, rows FROM record_csv_data WHERE record_id = ?",
+            "SELECT rows FROM record_csv_data WHERE record_id = ?",
             (record_id,),
         )
         if not csv_row:
@@ -100,9 +100,8 @@ async def get_csv_data(
                 detail="No CSV data found for this record.",
             )
 
-        headers = json.loads(csv_row["headers"])
-        rows    = json.loads(csv_row["rows"])
-        return {"headers": headers, "rows": rows}
+        rows = json.loads(csv_row["rows"])
+        return {"rows": rows}
 
     except HTTPException:
         raise
@@ -195,8 +194,7 @@ async def upload_csv(
             )
 
         # --- Sanitize ---
-        headers = [] # Obsolete, kept for backwards DB compatibility
-        rows    = [[_sanitize_cell(cell) for cell in row] for row in all_rows]
+        rows = [[_sanitize_cell(cell) for cell in row] for row in all_rows]
 
         # --- Persist ---
         username = current_user["sub"]
@@ -205,10 +203,10 @@ async def upload_csv(
         execute(
             """
             INSERT OR REPLACE INTO record_csv_data
-                (record_id, headers, rows, uploaded_by, uploaded_date, updated_by, updated_date)
-            VALUES (?, ?, ?, ?, ?, NULL, NULL)
+                (record_id, rows, uploaded_by, uploaded_date, updated_by, updated_date)
+            VALUES (?, ?, ?, ?, NULL, NULL)
             """,
-            (record_id, json.dumps(headers), json.dumps(rows), username, now),
+            (record_id, json.dumps(rows), username, now),
         )
 
         execute(
@@ -222,11 +220,11 @@ async def upload_csv(
             (now, username, now, record_id),
         )
 
+        col_count = len(rows[0]) if rows else 0
         return CsvResponse(
-            headers=headers,
             rows=rows,
             row_count=len(rows),
-            col_count=len(headers),
+            col_count=col_count,
         )
 
     except HTTPException:
@@ -273,14 +271,7 @@ async def save_csv_data(
             )
 
         # --- Validate body ---
-        headers = body.headers
-        rows    = body.rows
-
-        if headers is None or not isinstance(headers, list) or not all(isinstance(h, str) for h in headers):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="'headers' must be a list of strings.",
-            )
+        rows = body.rows
 
         if not isinstance(rows, list):
             raise HTTPException(
@@ -288,7 +279,7 @@ async def save_csv_data(
                 detail="'rows' must be a list of lists.",
             )
 
-        col_count = len(headers)
+        col_count = len(rows[0]) if rows else 0
 
         if col_count > MAX_CSV_COLUMNS:
             raise HTTPException(
@@ -324,21 +315,19 @@ async def save_csv_data(
                     )
 
         # --- Sanitize ---
-        clean_headers = [_sanitize_cell(h) for h in headers]
-        clean_rows    = [[_sanitize_cell(cell) for cell in row] for row in rows]
+        clean_rows = [[_sanitize_cell(cell) for cell in row] for row in rows]
 
         # --- Persist ---
         now = _now_utc_str()
         execute(
             """
             UPDATE record_csv_data
-            SET headers      = ?,
-                rows         = ?,
+            SET rows         = ?,
                 updated_by   = ?,
                 updated_date = ?
             WHERE record_id  = ?
             """,
-            (json.dumps(clean_headers), json.dumps(clean_rows), username, now, record_id),
+            (json.dumps(clean_rows), username, now, record_id),
         )
 
         execute(
@@ -352,7 +341,7 @@ async def save_csv_data(
             (now, username, now, record_id),
         )
 
-        return {"headers": clean_headers, "rows": clean_rows}
+        return {"rows": clean_rows}
 
     except HTTPException:
         raise
@@ -380,7 +369,7 @@ async def download_csv(
         _get_active_record(record_id)
 
         csv_row = fetch_one(
-            "SELECT headers, rows FROM record_csv_data WHERE record_id = ?",
+            "SELECT rows FROM record_csv_data WHERE record_id = ?",
             (record_id,),
         )
         if not csv_row:
@@ -389,14 +378,11 @@ async def download_csv(
                 detail="No CSV data found for this record.",
             )
 
-        headers = json.loads(csv_row["headers"])
-        rows    = json.loads(csv_row["rows"])
+        rows = json.loads(csv_row["rows"])
 
         # Reconstruct CSV in memory
         buffer = io.StringIO()
         writer = csv.writer(buffer)
-        if headers and headers not in rows:
-            writer.writerow(headers)
         writer.writerows(rows)
         buffer.seek(0)
 
