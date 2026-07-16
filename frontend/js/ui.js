@@ -235,7 +235,7 @@ function renderRecordsTable(records, userRole, username) {
     appendCell(row, formatDisplayDate(record.created_time));
 
     // Equipment ID
-    appendCell(row, record.equipment_id);
+    appendCell(row, record.equipment_full_path || record.equipment_id);
 
     // Type — with badge styling
     const typeTd = document.createElement("td");
@@ -373,7 +373,7 @@ function showRecordDetail(record, userRole, username) {
 
   set("detail-id",                    record.id);
   set("detail-maintenance-type",      record.maintenance_type);
-  set("detail-equipment-id",          record.equipment_id);
+  set("detail-equipment-id", record.equipment_full_path || record.equipment_id);
   set("detail-responsible-person",    record.responsible_person);
   set("detail-operating-conditions",  record.operating_conditions);
   set("detail-inventory-consumables", record.inventory_consumables);
@@ -959,127 +959,170 @@ function readCsvGridValues(wrapperEl, parsedCsvTables) {
 }
 
 // ---------------------------------------------------------------------------
-// Equipment searchable dropdown
+// Equipment master table rendering
 // ---------------------------------------------------------------------------
 
 /**
- * Filter the equipment array and re-render the dropdown list.
- *
- * @param {Array<object>} equipment  - Full equipment array from the API
- * @param {string}        searchTerm - Current text in the visible search input
- * @param {HTMLElement}   listEl     - The <ul> dropdown list element
- * @param {HTMLInputElement} hiddenEl - The hidden input that holds the selected code
- * @param {HTMLInputElement} inputEl  - The visible search input
+ * Build the equipment master table rows.
+ * @param {Array<object>} equipmentList
+ * @param {string} currentUsername
+ * @param {boolean} isAdmin
+ * @param {function} onToggleClick
+ * @param {function} onDeleteClick
+ * @returns {HTMLElement} tbody
  */
-function filterAndRenderEquipmentList(equipment, searchTerm, listEl, hiddenEl, inputEl) {
-  // Clear list safely
-  listEl.textContent = "";
+function renderEquipmentMasterTable(equipmentList, currentUsername, isAdmin, onToggleClick, onDeleteClick) {
+  const tbody = document.createElement("tbody");
 
-  if (!searchTerm) {
-    // Empty search — close list and clear the hidden value (selection is ambiguous)
-    listEl.classList.remove("open");
-    hiddenEl.value = "";
-    inputEl.setAttribute("aria-expanded", "false");
-    return;
+  if (!equipmentList || equipmentList.length === 0) {
+    return tbody;
   }
 
-  const lower = searchTerm.toLowerCase();
-  const matches = equipment.filter((item) =>
-    item.code.toLowerCase().includes(lower)
-  );
+  equipmentList.forEach((eq, index) => {
+    const row = document.createElement("tr");
 
-  if (matches.length === 0) {
-    const li = document.createElement("li");
-    li.className = "equipment-dropdown-empty";
-    li.textContent = "No equipment found.";
-    listEl.appendChild(li);
-  } else {
-    matches.forEach((item) => {
-      const li = document.createElement("li");
-      li.textContent = item.code;
-      li.setAttribute("role", "option");
-      li.setAttribute("tabindex", "-1"); // required: makes li focusable so e.relatedTarget in focusout points here, not null
+    const idTd = document.createElement("td");
+    const idBadge = document.createElement("span");
+    idBadge.className = "record-id-badge";
+    idBadge.textContent = "#" + eq.id;
+    idTd.appendChild(idBadge);
+    row.appendChild(idTd);
 
-      // Mark as selected if this code is already chosen
-      if (hiddenEl.value === item.code) {
-        li.classList.add("selected");
-      }
+    appendCell(row, eq.enterprise_name);
+    appendCell(row, eq.site);
+    appendCell(row, eq.area);
+    appendCell(row, eq.work_center);
+    appendCell(row, eq.work_unit);
+    appendCell(row, eq.equipment_id);
 
-      li.addEventListener("click", () => {
-        hiddenEl.value = item.code;
-        inputEl.value  = item.code;
-        listEl.classList.remove("open");
-        inputEl.setAttribute("aria-expanded", "false");
-        // Clear any existing validation error on the equipment field
-        clearFieldErrors();
+    const statusTd = document.createElement("td");
+    const statusBadge = document.createElement("span");
+    statusBadge.className = "type-badge " + (eq.is_active ? "type-badge-conducted" : "type-badge-planned");
+    statusBadge.textContent = eq.is_active ? "Active" : "Inactive";
+    statusTd.appendChild(statusBadge);
+    row.appendChild(statusTd);
+
+    const actionTd = document.createElement("td");
+    if (isAdmin) {
+      const actionsDiv = document.createElement("div");
+      actionsDiv.className = "d-flex gap-1";
+
+      const toggleBtn = document.createElement("button");
+      toggleBtn.className = "btn btn-sm btn-outline-secondary";
+      toggleBtn.textContent = eq.is_active ? "Deactivate" : "Activate";
+      toggleBtn.addEventListener("click", () => {
+        if (onToggleClick) onToggleClick(eq);
       });
+      actionsDiv.appendChild(toggleBtn);
 
+      const deleteBtn = document.createElement("button");
+      deleteBtn.className = "btn btn-sm btn-outline-danger";
+      deleteBtn.textContent = "Delete";
+      deleteBtn.addEventListener("click", () => {
+        if (onDeleteClick) onDeleteClick(eq);
+      });
+      actionsDiv.appendChild(deleteBtn);
+
+      actionTd.appendChild(actionsDiv);
+    } else {
+      actionTd.className = "d-none";
+    }
+    row.appendChild(actionTd);
+
+    tbody.appendChild(row);
+  });
+
+  return tbody;
+}
+
+
+
+
+// ---------------------------------------------------------------------------
+// Searchable Equipment Dropdown
+// ---------------------------------------------------------------------------
+
+/**
+ * Build an interactive dropdown that filters equipment by ID or full path.
+ *
+ * @param {Array<object>} equipmentList Array of equipment objects from API
+ * @param {HTMLElement} searchEl The visible text input
+ * @param {HTMLElement} listEl The ul element to hold dropdown items
+ * @param {HTMLElement} hiddenInputEl The hidden input holding the actual ID
+ */
+function buildEquipmentDropdown(equipmentList, searchEl, listEl, hiddenInputEl) {
+  if (!searchEl || !listEl || !hiddenInputEl) return;
+
+  function renderList(filterText = "") {
+    listEl.textContent = "";
+    const lowerFilter = filterText.toLowerCase();
+
+    const filtered = equipmentList.filter(eq => 
+      (eq.equipment_id || "").toLowerCase().includes(lowerFilter) || 
+      (eq.full_path || "").toLowerCase().includes(lowerFilter)
+    );
+
+    if (filtered.length === 0) {
+      const li = document.createElement("li");
+      li.className = "equipment-dropdown-empty";
+      li.textContent = "No matches found.";
+      listEl.appendChild(li);
+      return;
+    }
+
+    filtered.forEach(eq => {
+      const li = document.createElement("li");
+      li.textContent = eq.full_path;
+      li.dataset.value = eq.equipment_id;
+
+      li.addEventListener("mousedown", (e) => {
+        e.preventDefault(); // Prevent blur on searchEl so we can handle the click
+        searchEl.value = eq.full_path;
+        hiddenInputEl.value = eq.equipment_id;
+        listEl.classList.remove("open");
+        searchEl.classList.remove("is-invalid");
+      });
       listEl.appendChild(li);
     });
   }
 
-  listEl.classList.add("open");
-  inputEl.setAttribute("aria-expanded", "true");
+  searchEl.addEventListener("focus", () => {
+    renderList(searchEl.value);
+    listEl.classList.add("open");
+  });
+
+  searchEl.addEventListener("input", () => {
+    hiddenInputEl.value = ""; // invalidate hidden field on manual type
+    renderList(searchEl.value);
+    listEl.classList.add("open");
+  });
+
+  searchEl.addEventListener("blur", () => {
+    // delay hiding so mousedown on items fires first
+    setTimeout(() => {
+      listEl.classList.remove("open");
+      const match = equipmentList.find(eq => 
+        (eq.full_path || "").toLowerCase() === searchEl.value.trim().toLowerCase() ||
+        (eq.equipment_id || "").toLowerCase() === searchEl.value.trim().toLowerCase()
+      );
+      if (match) {
+        hiddenInputEl.value = match.equipment_id;
+        searchEl.value = match.full_path;
+      } else {
+        hiddenInputEl.value = "";
+      }
+    }, 150);
+  });
 }
 
 /**
- * Initialise all event listeners for the searchable equipment dropdown.
- *
- * @param {Array<object>}   equipment - Full equipment array from the API
- * @param {HTMLInputElement} inputEl  - The visible search input (#equipmentSearch)
- * @param {HTMLElement}      listEl   - The <ul> dropdown list (#equipmentDropdownList)
- * @param {HTMLInputElement} hiddenEl - The hidden value input (#equipmentId)
+ * Pre-populate the custom dropdown
  */
-function buildEquipmentDropdown(equipment, inputEl, listEl, hiddenEl) {
-  if (!inputEl || !listEl || !hiddenEl) return;
-
-  // Re-filter and re-render on every keystroke in the search box
-  inputEl.addEventListener("input", () => {
-    filterAndRenderEquipmentList(equipment, inputEl.value, listEl, hiddenEl, inputEl);
-  });
-
-  // Show the list when the input is focused (if there is already a search term)
-  inputEl.addEventListener("focus", () => {
-    if (inputEl.value) {
-      filterAndRenderEquipmentList(equipment, inputEl.value, listEl, hiddenEl, inputEl);
-    }
-  });
-
-  // Close the dropdown when focus leaves the wrapper entirely.
-  // relatedTarget check prevents premature close when clicking a list item
-  // (the click event fires before the blur, so relatedTarget is the <li>).
-  const wrapper = inputEl.closest(".equipment-dropdown-wrapper");
-  if (wrapper) {
-    wrapper.addEventListener("focusout", (e) => {
-      if (!wrapper.contains(e.relatedTarget)) {
-        listEl.classList.remove("open");
-        inputEl.setAttribute("aria-expanded", "false");
-      }
-    });
+function setEquipmentDropdownValue(equipmentList, selectedId, searchEl, hiddenInputEl) {
+  if (!searchEl || !hiddenInputEl || !selectedId) return;
+  const match = equipmentList.find(eq => eq.equipment_id === selectedId);
+  if (match) {
+    searchEl.value = match.full_path;
+    hiddenInputEl.value = match.equipment_id;
   }
 }
-
-/**
- * Pre-populate the searchable equipment dropdown in edit mode.
- * Handles deactivated / unrecognised codes gracefully — displays the raw stored
- * value so the edit form never blanks out a previously saved equipment_id.
- *
- * @param {Array<object>}   equipment - Full equipment array from the API
- * @param {string}          code      - The equipment_id stored on the record
- * @param {HTMLInputElement} inputEl  - The visible search input (#equipmentSearch)
- * @param {HTMLInputElement} hiddenEl - The hidden value input (#equipmentId)
- */
-function setEquipmentDropdownValue(equipment, code, inputEl, hiddenEl) {
-  if (!code) return;
-
-  // Find the matching item — may be absent if the equipment was deactivated
-  const found = equipment.find((item) => item.code === code);
-
-  // Whether found or not, display and preserve the stored code value
-  if (inputEl)  inputEl.value  = code;
-  if (hiddenEl) hiddenEl.value = code;
-
-  // Suppress unused-variable lint — found is used only as a guard
-  void found;
-}
-
