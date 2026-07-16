@@ -216,7 +216,82 @@
               <div class="field-error" id="eq-id-error"></div>
             </div>
           </form>
-        </div>
+
+          <!-- Divider -->
+          <hr class="bulk-upload-divider">
+
+          <div class="bulk-upload-section">
+
+            <!-- Section label and instructions -->
+            <p class="section-label" style="margin-bottom: var(--space-sm);">
+              Bulk Upload via CSV
+            </p>
+            <p class="meta-text" style="margin-bottom: var(--space-xs);">
+              Upload a <strong>.csv</strong> file with the following column headers
+              (order does not matter):
+            </p>
+            <p class="meta-text bulk-upload-column-list" style="margin-bottom: var(--space-md);">
+              Enterprise Name &nbsp;·&nbsp; Site &nbsp;·&nbsp; Area &nbsp;·&nbsp;
+              Work Center &nbsp;·&nbsp; Work Unit &nbsp;·&nbsp; Equipment ID
+            </p>
+            <p class="meta-text" style="margin-bottom: var(--space-md);">
+              Using Excel? Go to <strong>File &rarr; Save As &rarr; CSV (Comma delimited)</strong>
+              before uploading. Duplicate entries are skipped automatically.
+              Maximum 500 rows per upload.
+            </p>
+
+            <!-- Template download -->
+            <p class="meta-text" style="margin-bottom: var(--space-md);">
+              <a href="#" id="downloadEquipmentTemplateBtn" class="bulk-upload-template-link">
+                Download CSV template
+              </a>
+            </p>
+
+            <!-- File chooser row -->
+            <div class="bulk-upload-row">
+              <input
+                type="file"
+                id="equipmentBulkFileInput"
+                accept=".csv"
+                style="display:none;"
+                aria-label="Choose CSV file for bulk equipment upload">
+              <button
+                type="button"
+                class="btn btn-outline-secondary btn-sm"
+                id="equipmentBulkSelectBtn">
+                Choose CSV File
+              </button>
+              <span
+                class="bulk-upload-filename"
+                id="equipmentBulkFilename"
+                aria-live="polite">
+                No file chosen
+              </span>
+              <button
+                type="button"
+                class="btn btn-primary btn-sm"
+                id="equipmentBulkUploadBtn"
+                disabled>
+                Upload
+              </button>
+            </div>
+
+            <!-- Validation error list — hidden until a 422 response is received -->
+            <div
+              class="bulk-upload-errors"
+              id="equipmentBulkErrors"
+              style="display:none;"
+              role="alert"
+              aria-live="assertive">
+              <p class="bulk-upload-errors-title">
+                Fix the following errors and re-upload:
+              </p>
+              <ul id="equipmentBulkErrorList"></ul>
+            </div>
+
+          </div>
+
+        </div><!-- /.modal-body -->
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
           <button type="button" class="btn btn-primary" id="btn-save-equipment">Save Equipment</button>
@@ -224,6 +299,7 @@
       </div>
     </div>
   </div>
+
 
   <!-- Toast container -->
   <div id="toast-container" class="toast-container" aria-live="polite"></div>
