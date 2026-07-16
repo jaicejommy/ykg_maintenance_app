@@ -359,11 +359,11 @@ async function deleteAttachment(attachmentId) {
 
 /**
  * Fetch CSV data for a record.
- * Returns { headers: string[], rows: string[][] } or throws on non-2xx.
+ * Returns { rows: string[][] } or throws on non-2xx.
  * The thrown Error has a `.status` property set to the HTTP status code so
  * callers can distinguish 404 (no CSV yet) from genuine server errors.
  * @param {number} recordId
- * @returns {Promise<{headers: string[], rows: string[][]}>}
+ * @returns {Promise<{rows: string[][]}>}
  */
 async function getCsvData(recordId) {
   const response = await fetch(`${API_BASE}/api/csv/${recordId}`, {
@@ -390,7 +390,7 @@ async function getCsvData(recordId) {
  * Upload a CSV file for a record (multipart/form-data).
  * @param {number} recordId
  * @param {FormData} formData - must include field "csv_file"
- * @returns {Promise<{headers: string[], rows: string[][], row_count: number, col_count: number}>}
+ * @returns {Promise<{rows: string[][], row_count: number, col_count: number}>}
  */
 async function uploadCsv(recordId, formData) {
   const response = await fetch(`${API_BASE}/api/csv/${recordId}`, {
@@ -408,8 +408,8 @@ async function uploadCsv(recordId, formData) {
 /**
  * Save edited CSV grid data for a record.
  * @param {number} recordId
- * @param {{ headers: string[], rows: string[][] }} data
- * @returns {Promise<{headers: string[], rows: string[][]}>}
+ * @param {{ rows: string[][] }} data
+ * @returns {Promise<{rows: string[][]}>}
  */
 async function saveCsvData(recordId, data) {
   const response = await fetch(`${API_BASE}/api/csv/${recordId}`, {

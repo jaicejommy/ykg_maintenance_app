@@ -1856,7 +1856,7 @@ async function initRecordDetailPage() {
 
           setLoading(btnSave, true);
           try {
-              await saveCsvData(recordId, { headers: [], rows: rebuiltRows });
+              await saveCsvData(recordId, { rows: rebuiltRows });
               _allRows = rebuiltRows;
               _savedRows = JSON.parse(JSON.stringify(_allRows));
               _parsedCsv = window.csvSchema.parseFullCsv(_allRows);
@@ -2051,7 +2051,7 @@ async function _populateDetailAttachments(recordId) {
  * @param {string[][]} rows
  * @param {boolean} isEditable
  */
-function _renderGrid(headers, rows, isEditable) {
+function _renderGrid(rows, isEditable) {
   const container = document.getElementById("csv-grid-container");
   if (!container) return;
 
@@ -2059,7 +2059,7 @@ function _renderGrid(headers, rows, isEditable) {
   const existing = container.querySelector(".csv-grid-wrapper");
   if (existing) existing.remove();
 
-  const table   = renderCsvGrid(headers, rows, isEditable);
+  const table   = renderCsvGrid(rows, isEditable);
   const wrapper = document.createElement("div");
   wrapper.className = "csv-grid-wrapper";
   wrapper.appendChild(table);
