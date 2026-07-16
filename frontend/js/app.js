@@ -295,6 +295,154 @@ function initChangePasswordModal() {
 }
 
 // ---------------------------------------------------------------------------
+// SHARED PAGINATOR FACTORY
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a client-side paginator instance for a table.
+ *
+ * Returns { setData, render, reset }.
+ *   setData(items) — replace the full data array and reset to page 1.
+ *   render()       — render the current page and rebuild the control bar.
+ *   reset()        — reset to page 1 without replacing data.
+ *
+ * onRender(pageItems, allItems) is called on every render:
+ *   pageItems — the slice for the current page
+ *   allItems  — the full (filtered) array, used for stats / empty-state
+ *
+ * The control bar is injected into the element whose id is `containerId`.
+ * It is hidden automatically when all rows fit on one page.
+ *
+ * @param {object}   options
+ * @param {string}   options.containerId   - id of the pagination bar container
+ * @param {number}   [options.pageSize=25] - initial rows per page
+ * @param {function} options.onRender      - callback(pageItems, allItems)
+ * @returns {{ setData: function, render: function, reset: function }}
+ */
+function _createPaginator({ containerId, pageSize: initialPageSize = 25, onRender }) {
+  let _allItems = [];
+  let _page     = 1;
+  let _pageSize = initialPageSize;
+
+  function _totalPages() {
+    return Math.max(1, Math.ceil(_allItems.length / _pageSize));
+  }
+
+  function _getPageItems() {
+    const start = (_page - 1) * _pageSize;
+    return _allItems.slice(start, start + _pageSize);
+  }
+
+  function _buildControls() {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    container.textContent = ''; // clear — never innerHTML
+
+    const total      = _allItems.length;
+    const totalPages = _totalPages();
+
+    if (total === 0 || totalPages <= 1) {
+      container.style.display = 'none';
+      return;
+    }
+
+    container.style.display = 'flex';
+
+    // "Showing X–Y of Z"
+    const rangeStart = (_page - 1) * _pageSize + 1;
+    const rangeEnd   = Math.min(_page * _pageSize, total);
+    const infoEl     = document.createElement('span');
+    infoEl.className   = 'pagination-info';
+    infoEl.textContent = `Showing ${rangeStart}\u2013${rangeEnd} of ${total}`;
+    container.appendChild(infoEl);
+
+    // Right-side controls
+    const controls = document.createElement('div');
+    controls.className = 'pagination-controls';
+
+    // "Rows per page" label
+    const sizeLabel = document.createElement('span');
+    sizeLabel.className   = 'pagination-page-size';
+    sizeLabel.textContent = 'Rows per page:';
+    controls.appendChild(sizeLabel);
+
+    // Page-size selector
+    const sizeSelect = document.createElement('select');
+    sizeSelect.className = 'pagination-size-select';
+    sizeSelect.setAttribute('aria-label', 'Rows per page');
+    [10, 25, 50, 100].forEach(size => {
+      const opt = document.createElement('option');
+      opt.value       = String(size);
+      opt.textContent = String(size);
+      if (size === _pageSize) opt.selected = true;
+      sizeSelect.appendChild(opt);
+    });
+    sizeSelect.addEventListener('change', () => {
+      _pageSize = parseInt(sizeSelect.value, 10);
+      _page     = 1;
+      _renderPage();
+    });
+    controls.appendChild(sizeSelect);
+
+    // Prev button
+    const prevBtn = document.createElement('button');
+    prevBtn.type      = 'button';
+    prevBtn.className = 'pagination-btn';
+    prevBtn.setAttribute('aria-label', 'Previous page');
+    prevBtn.textContent = '\u2190 Prev';
+    prevBtn.disabled    = (_page <= 1);
+    prevBtn.addEventListener('click', () => {
+      if (_page > 1) { _page--; _renderPage(); }
+    });
+    controls.appendChild(prevBtn);
+
+    // Page indicator: "Page N of M"
+    const pageEl = document.createElement('span');
+    pageEl.className   = 'pagination-page-indicator';
+    pageEl.textContent = `Page ${_page} of ${totalPages}`;
+    controls.appendChild(pageEl);
+
+    // Next button
+    const nextBtn = document.createElement('button');
+    nextBtn.type      = 'button';
+    nextBtn.className = 'pagination-btn';
+    nextBtn.setAttribute('aria-label', 'Next page');
+    nextBtn.textContent = 'Next \u2192';
+    nextBtn.disabled    = (_page >= totalPages);
+    nextBtn.addEventListener('click', () => {
+      if (_page < _totalPages()) { _page++; _renderPage(); }
+    });
+    controls.appendChild(nextBtn);
+
+    container.appendChild(controls);
+  }
+
+  function _renderPage() {
+    if (typeof onRender === 'function') {
+      onRender(_getPageItems(), _allItems);
+    }
+    _buildControls();
+  }
+
+  return {
+    /** Replace the full data array and reset to page 1. */
+    setData(items) {
+      _allItems = Array.isArray(items) ? items : [];
+      _page     = 1;
+    },
+    /** Re-render the current page and rebuild the control bar. */
+    render() {
+      _renderPage();
+    },
+    /** Reset to page 1 without replacing data. */
+    reset() {
+      _page = 1;
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // DASHBOARD PAGE
 // ---------------------------------------------------------------------------
 
@@ -413,25 +561,47 @@ function initDashboardPage() {
       });
   }
 
+  // Paginator for the maintenance records table — 25 rows per page by default.
+  const dashPaginator = _createPaginator({
+    containerId: 'dashboard-pagination',
+    pageSize:    25,
+    onRender(pageItems, allItems) {
+      // Render only the current page's rows into the table
+      renderRecordsTable(pageItems, role, username);
+
+      // Override stats to reflect the FULL filtered set, not just the visible page
+      const statsTotal    = document.getElementById('stat-total');
+      const statPlanned   = document.getElementById('stat-planned');
+      const statConducted = document.getElementById('stat-conducted');
+      if (statsTotal)    statsTotal.textContent    = String(allItems.length);
+      if (statPlanned)   statPlanned.textContent   = String(allItems.filter(r => r.maintenance_type === 'Planned').length);
+      if (statConducted) statConducted.textContent = String(allItems.filter(r => r.maintenance_type === 'Conducted').length);
+
+      attachRowClickListeners(role, username);
+
+      // Clear stale selection state whenever the page changes
+      if (typeof window._dashboardClearSelection === 'function') {
+        window._dashboardClearSelection();
+      }
+      _initBulkActions();
+    },
+  });
+
   async function _fetchAndRenderRecords() {
     try {
-        const filters = _getCurrentFilters();
-        const data    = await getRecords(filters);
-        allRecords    = Array.isArray(data) ? data : (data.records || []);
-        
-        _recordsMap = {};
-        allRecords.forEach((r) => { _recordsMap[r.id] = r; });
+      const filters = _getCurrentFilters();
+      const data    = await getRecords(filters);
+      allRecords    = Array.isArray(data) ? data : (data.records || []);
 
-        if (typeof window._dashboardClearSelection === "function") {
-          window._dashboardClearSelection();
-        }
+      _recordsMap = {};
+      allRecords.forEach((r) => { _recordsMap[r.id] = r; });
 
-        const filtered = applyDashboardFilters(allRecords, filters);
-        renderRecordsTable(filtered, role, username);
-        attachRowClickListeners(role, username);
-        _updateSortIndicators();
+      const filtered = applyDashboardFilters(allRecords, filters);
+      dashPaginator.setData(filtered);
+      dashPaginator.render();
+      _updateSortIndicators();
     } catch (err) {
-        showToast(err.message || 'Failed to load records.', 'error');
+      showToast(err.message || 'Failed to load records.', 'error');
     }
   }
 
@@ -498,10 +668,8 @@ function initDashboardPage() {
     });
   }
 
-  // Initial load
-  _fetchAndRenderRecords().then(() => {
-    _initBulkActions();
-  });
+  // Initial load — _initBulkActions is now called inside dashPaginator.onRender
+  _fetchAndRenderRecords();
 }
 
 /**
@@ -1957,56 +2125,84 @@ async function initEquipmentMasterPage() {
     if (actionsTh) actionsTh.classList.add("d-none");
   }
 
-  const searchInput = document.getElementById("equipment-search-input");
+  const searchInput    = document.getElementById("equipment-search-input");
   const activeCheckbox = document.getElementById("equipment-active-only");
+
+  // Paginator for the equipment list — 25 rows per page by default.
+  // onRender references _onToggleEquipment and _onDeleteEquipment, which are
+  // declared as consts below. They are only invoked when buttons are clicked
+  // (after all consts in this scope are fully initialised), so the
+  // temporal-dead-zone ordering is safe.
+  const eqPaginator = _createPaginator({
+    containerId: 'equipment-pagination',
+    pageSize:    25,
+    onRender(pageItems, allItems) {
+      const emptyEl  = document.getElementById('equipment-empty-state');
+      const oldTbody = document.getElementById('equipment-master-tbody');
+
+      if (allItems.length === 0) {
+        if (oldTbody) oldTbody.textContent = '';
+        if (emptyEl)  emptyEl.style.display = '';
+        return;
+      }
+      if (emptyEl) emptyEl.style.display = 'none';
+
+      const newTbody = renderEquipmentMasterTable(
+        pageItems,
+        getUsername(),
+        isAdmin,
+        _onToggleEquipment,
+        _onDeleteEquipment
+      );
+      if (oldTbody) {
+        newTbody.id = 'equipment-master-tbody';
+        oldTbody.parentNode.replaceChild(newTbody, oldTbody);
+      }
+    },
+  });
+
+  // Toggle active status — references hoisted _fetchAndRenderEquipment declaration.
+  const _onToggleEquipment = async (eq) => {
+    try {
+      await updateEquipment(eq.id, { is_active: !eq.is_active });
+      showToast(
+        `Equipment ${eq.equipment_id} ${eq.is_active ? 'deactivated' : 'activated'}.`,
+        'success'
+      );
+      _fetchAndRenderEquipment();
+    } catch (err) {
+      showToast(err.message || 'Failed to update equipment.', 'error');
+    }
+  };
+
+  const _onDeleteEquipment = async (eq) => {
+    openTypeToConfirmModal({
+      title:              'Delete Equipment',
+      message:            `Are you sure you want to permanently delete equipment ID "${eq.equipment_id}"? This cannot be undone.`,
+      confirmTargetText:  eq.equipment_id,
+      confirmButtonLabel: 'Delete Equipment',
+      onConfirmed: async () => {
+        try {
+          await deleteEquipment(eq.id);
+          showToast(`Equipment ${eq.equipment_id} deleted.`, 'success');
+          _fetchAndRenderEquipment();
+        } catch (err) {
+          showToast(err.message || 'Failed to delete equipment.', 'error');
+        }
+      },
+    });
+  };
 
   async function _fetchAndRenderEquipment() {
     try {
-      const search = searchInput ? searchInput.value.trim() : "";
-      const activeOnly = activeCheckbox ? activeCheckbox.checked : true;
+      const search     = searchInput     ? searchInput.value.trim() : '';
+      const activeOnly = activeCheckbox  ? activeCheckbox.checked   : true;
 
       const equipmentList = await getEquipmentList(search, activeOnly);
-      
-      const newTbody = renderEquipmentMasterTable(
-        equipmentList,
-        getUsername(),
-        isAdmin,
-        async (eq) => { // Toggle
-          try {
-            await updateEquipment(eq.id, { is_active: !eq.is_active });
-            showToast(`Equipment ${eq.equipment_id} ${eq.is_active ? 'deactivated' : 'activated'}.`, "success");
-            _fetchAndRenderEquipment();
-          } catch (err) {
-            showToast(err.message || "Failed to update equipment.", "error");
-          }
-        },
-        async (eq) => { // Delete
-          openTypeToConfirmModal({
-            title: "Delete Equipment",
-            message: `Are you sure you want to permanently delete equipment ID "${eq.equipment_id}"? This cannot be undone.`,
-            confirmTargetText: eq.equipment_id,
-            confirmButtonLabel: "Delete Equipment",
-            onConfirmed: async () => {
-              try {
-                await deleteEquipment(eq.id);
-                showToast(`Equipment ${eq.equipment_id} deleted.`, "success");
-                _fetchAndRenderEquipment();
-              } catch (err) {
-                showToast(err.message || "Failed to delete equipment.", "error");
-              }
-            }
-          });
-        }
-      );
-      
-      const oldTbody = document.getElementById("equipment-master-tbody");
-      if (oldTbody) {
-        newTbody.id = "equipment-master-tbody";
-        oldTbody.parentNode.replaceChild(newTbody, oldTbody);
-      }
-      
+      eqPaginator.setData(equipmentList);
+      eqPaginator.render();
     } catch (err) {
-      showToast(err.message || "Failed to load equipment.", "error");
+      showToast(err.message || 'Failed to load equipment.', 'error');
     }
   }
 

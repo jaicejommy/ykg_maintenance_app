@@ -2270,3 +2270,180 @@ th.sort-active {
   display: inline-block;
   min-width: 10px;
 }
+/* ── Equipment Bulk Upload ───────────────────────────────── */
+.bulk-upload-divider {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: var(--space-lg) 0;
+}
+
+.bulk-upload-section {
+  padding-top: var(--space-xs);
+}
+
+.bulk-upload-column-list {
+  font-family: var(--font-family);
+  color: var(--color-text-secondary);
+}
+
+.bulk-upload-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.bulk-upload-filename {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bulk-upload-template-link {
+  font-size: var(--font-size-sm);
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.bulk-upload-template-link:hover {
+  text-decoration: underline;
+}
+
+.bulk-upload-errors {
+  margin-top: var(--space-md);
+  padding: var(--space-md);
+  background: #FEF2F2;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-md);
+}
+
+.bulk-upload-errors-title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-danger);
+  margin-bottom: var(--space-sm);
+}
+
+.bulk-upload-errors ul {
+  margin: 0;
+  padding-left: var(--space-lg);
+}
+
+.bulk-upload-errors ul li {
+  font-size: var(--font-size-sm);
+  color: #7F1D1D;
+  margin-bottom: var(--space-xs);
+  line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+  .bulk-upload-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-sm);
+  }
+
+  .bulk-upload-filename {
+    width: 100%;
+  }
+}
+
+/* ============================================================
+   PAGINATION BAR
+   Used by _createPaginator() in app.js on the Dashboard and
+   Equipment Master pages. All values use existing CSS tokens.
+   ============================================================ */
+
+.pagination-bar {
+  display: none; /* shown/hidden by JS */
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-lg);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+  flex-wrap: wrap;
+}
+
+.pagination-info {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.pagination-page-size {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.pagination-size-select {
+  font-size: var(--font-size-sm);
+  padding: 2px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  font-family: var(--font-family);
+}
+
+.pagination-size-select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.pagination-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family);
+  background: var(--color-surface);
+  color: var(--color-accent);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+  white-space: nowrap;
+  line-height: 1.5;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pagination-page-indicator {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  min-width: 90px;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .pagination-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-sm);
+  }
+
+  .pagination-page-indicator {
+    min-width: unset;
+  }
+}
