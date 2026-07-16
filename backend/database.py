@@ -81,7 +81,6 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS record_csv_data (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
                 record_id     INTEGER NOT NULL UNIQUE,
-                headers       TEXT NOT NULL,
                 rows          TEXT NOT NULL,
                 uploaded_by   TEXT NOT NULL,
                 uploaded_date TEXT NOT NULL,
