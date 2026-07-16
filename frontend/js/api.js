@@ -657,3 +657,48 @@ async function exportRecordsPdfBulk(recordIds, onProgress) {
   }
   return { succeeded, failed };
 }
+
+/**
+ * Upload a CSV file containing multiple equipment entries (Administrator only).
+ * Content-Type is intentionally omitted — the browser sets multipart/form-data
+ * with the correct boundary automatically when the body is a FormData object.
+ * On 422, err.errors contains the per-row validation error array.
+ * @param {FormData} formData - must include field "file" (.csv)
+ * @returns {Promise<{detail: string, inserted: number, skipped: number, total: number}>}
+ */
+async function bulkUploadEquipment(formData) {
+    // POST /api/equipment/bulk
+    // Body: FormData with field "file"
+    // IMPORTANT: Do NOT set Content-Type header manually.
+    //            The browser sets it automatically with the correct
+    //            multipart boundary when sending FormData.
+    const response = await fetch(`${API_BASE}/api/equipment/bulk`, {
+        method: 'POST',
+        headers: {
+            'Authorization': 'Bearer ' + getToken()
+            // Content-Type intentionally omitted
+        },
+        body: formData,
+    });
+
+    if (!response.ok) {
+        let message = 'Bulk upload failed.';
+        let errors  = null;
+        try {
+            const err = await response.json();
+            // Handle nested validation error structure from 422 responses
+            if (err.detail && typeof err.detail === 'object') {
+                message = err.detail.message || message;
+                errors  = err.detail.errors  || null;
+            } else if (err.detail) {
+                message = err.detail;
+            }
+        } catch (_) { /* response was not JSON — use fallback message */ }
+
+        const error   = new Error(message);
+        error.errors  = errors; // attach errors array for caller to display
+        throw error;
+    }
+
+    return response.json();
+}

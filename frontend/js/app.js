@@ -2088,6 +2088,7 @@ async function initEquipmentMasterPage() {
 
   // Initial load
   _fetchAndRenderEquipment();
+  _initBulkUpload(_fetchAndRenderEquipment);
 }
 
 // ---------------------------------------------------------------------------
@@ -2237,3 +2238,132 @@ function _openRestoreConfirm(record) {
 }
 
 
+
+
+function _initBulkUpload(reloadTable) {
+    const fileInput   = document.getElementById('equipmentBulkFileInput');
+    const selectBtn   = document.getElementById('equipmentBulkSelectBtn');
+    const uploadBtn   = document.getElementById('equipmentBulkUploadBtn');
+    const filenameEl  = document.getElementById('equipmentBulkFilename');
+    const errorsEl    = document.getElementById('equipmentBulkErrors');
+    const errListEl   = document.getElementById('equipmentBulkErrorList');
+    const templateBtn = document.getElementById('downloadEquipmentTemplateBtn');
+
+    // Guard — if elements are not on this page, do nothing
+    if (!fileInput || !selectBtn || !uploadBtn) return;
+
+    // ── "Choose CSV File" button ────────────────────────────
+    selectBtn.addEventListener('click', () => {
+        fileInput.value = ''; // reset so the same file can be re-selected
+        fileInput.click();
+    });
+
+    // ── File selected ───────────────────────────────────────
+    fileInput.addEventListener('change', () => {
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        // Client-side extension check — server also validates, this is UX only
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (ext !== 'csv') {
+            showToast(
+                'Only .csv files are supported. Save your Excel file as CSV first.',
+                'error'
+            );
+            fileInput.value        = '';
+            filenameEl.textContent = 'No file chosen';
+            uploadBtn.disabled     = true;
+            return;
+        }
+
+        filenameEl.textContent = file.name;
+        uploadBtn.disabled     = false;
+
+        // Clear any previous error list
+        _clearBulkErrors(errorsEl, errListEl);
+    });
+
+    // ── Upload button ───────────────────────────────────────
+    uploadBtn.addEventListener('click', async () => {
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        setLoading(uploadBtn, true);
+        _clearBulkErrors(errorsEl, errListEl);
+
+        try {
+            const result = await bulkUploadEquipment(formData);
+
+            showToast(result.detail, 'success');
+
+            // Reset file input state
+            fileInput.value        = '';
+            filenameEl.textContent = 'No file chosen';
+            uploadBtn.disabled     = true;
+
+            // Reload the equipment table to show newly added entries
+            // Use the exact function name found in investigation 1.3
+            await reloadTable();
+
+        } catch (err) {
+            if (err.errors && Array.isArray(err.errors) && err.errors.length > 0) {
+                // Validation error — show inline error list
+                _showBulkErrors(err.errors, errorsEl, errListEl);
+                showToast('Validation failed. See errors below.', 'error');
+            } else {
+                // Generic error — toast only
+                showToast(err.message || 'Upload failed.', 'error');
+            }
+        } finally {
+            setLoading(uploadBtn, false);
+        }
+    });
+
+    // ── Template download ───────────────────────────────────
+    if (templateBtn) {
+        templateBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            _downloadEquipmentTemplate();
+        });
+    }
+}
+
+function _clearBulkErrors(errorsEl, errListEl) {
+    if (errorsEl)  errorsEl.style.display = 'none';
+    if (errListEl) errListEl.textContent  = ''; // clear — never innerHTML
+}
+
+function _showBulkErrors(errors, errorsEl, errListEl) {
+    if (!errorsEl || !errListEl) return;
+
+    errListEl.textContent = ''; // clear before building — never innerHTML
+
+    errors.forEach(msg => {
+        const li = document.createElement('li');
+        li.textContent = msg; // textContent only — msg comes from server
+        errListEl.appendChild(li);
+    });
+
+    errorsEl.style.display = '';
+    // Scroll error list into view so user sees it without scrolling manually
+    errorsEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function _downloadEquipmentTemplate() {
+    const header  = 'Enterprise Name,Site,Area,Work Center,Work Unit,Equipment ID';
+    const example = 'Bapco,Sitra Refinery,Crude Distillation Unit,CDU Train A,Boiler Unit,BX-101';
+    const csv     = header + '\r\n' + example + '\r\n';
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.setAttribute('href', url);
+    a.setAttribute('download', 'equipment_upload_template.csv');
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url); // revoke immediately after click
+}
