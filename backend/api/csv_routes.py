@@ -276,10 +276,10 @@ async def save_csv_data(
         headers = body.headers
         rows    = body.rows
 
-        if not headers or not isinstance(headers, list) or not all(isinstance(h, str) for h in headers):
+        if headers is None or not isinstance(headers, list) or not all(isinstance(h, str) for h in headers):
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="'headers' must be a non-empty list of strings.",
+                detail="'headers' must be a list of strings.",
             )
 
         if not isinstance(rows, list):
@@ -395,7 +395,7 @@ async def download_csv(
         # Reconstruct CSV in memory
         buffer = io.StringIO()
         writer = csv.writer(buffer)
-        if headers not in rows:
+        if headers and headers not in rows:
             writer.writerow(headers)
         writer.writerows(rows)
         buffer.seek(0)
