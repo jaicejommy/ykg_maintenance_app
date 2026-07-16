@@ -145,13 +145,20 @@
               <thead>
                 <tr>
                   <th scope="col">#</th>
-                  <th data-sort-by="enterprise_name" class="sortable-col" scope="col">Enterprise<span class="sort-indicator" aria-hidden="true"></span></th>
-                  <th data-sort-by="site" class="sortable-col" scope="col">Site<span class="sort-indicator" aria-hidden="true"></span></th>
-                  <th data-sort-by="area" class="sortable-col" scope="col">Area<span class="sort-indicator" aria-hidden="true"></span></th>
-                  <th data-sort-by="work_center" class="sortable-col" scope="col">Work Center<span class="sort-indicator" aria-hidden="true"></span></th>
-                  <th data-sort-by="work_unit" class="sortable-col" scope="col">Work Unit<span class="sort-indicator" aria-hidden="true"></span></th>
-                  <th data-sort-by="equipment_id" class="sortable-col" scope="col">Equipment ID<span class="sort-indicator" aria-hidden="true"></span></th>
-                  <th data-sort-by="is_active" class="sortable-col" scope="col">Status<span class="sort-indicator" aria-hidden="true"></span></th>
+                  <th data-sort-by="enterprise_name" class="sortable-col" scope="col">Enterprise<span
+                      class="sort-indicator" aria-hidden="true"></span></th>
+                  <th data-sort-by="site" class="sortable-col" scope="col">Site<span class="sort-indicator"
+                      aria-hidden="true"></span></th>
+                  <th data-sort-by="area" class="sortable-col" scope="col">Area<span class="sort-indicator"
+                      aria-hidden="true"></span></th>
+                  <th data-sort-by="work_center" class="sortable-col" scope="col">Work Center<span
+                      class="sort-indicator" aria-hidden="true"></span></th>
+                  <th data-sort-by="work_unit" class="sortable-col" scope="col">Work Unit<span class="sort-indicator"
+                      aria-hidden="true"></span></th>
+                  <th data-sort-by="equipment_id" class="sortable-col" scope="col">Equipment ID<span
+                      class="sort-indicator" aria-hidden="true"></span></th>
+                  <th data-sort-by="is_active" class="sortable-col" scope="col">Status<span class="sort-indicator"
+                      aria-hidden="true"></span></th>
                   <th scope="col" id="equipment-actions-th">Actions</th>
                 </tr>
               </thead>
@@ -161,7 +168,8 @@
             </table>
 
             <!-- Pagination bar — populated and shown/hidden by _createPaginator() in app.js -->
-            <div id="equipment-pagination" class="pagination-bar" style="display:none;" aria-label="Table pagination"></div>
+            <div id="equipment-pagination" class="pagination-bar" style="display:none;" aria-label="Table pagination">
+            </div>
 
             <!-- Empty state -->
             <div id="equipment-empty-state" class="empty-state" style="display: none;" role="status" aria-live="polite">
@@ -231,15 +239,14 @@
             </p>
             <p class="meta-text" style="margin-bottom: var(--space-xs);">
               Upload a <strong>.csv</strong> file with the following column headers
-              (order does not matter):
+              (order insensitive):
             </p>
             <p class="meta-text bulk-upload-column-list" style="margin-bottom: var(--space-md);">
               Enterprise Name &nbsp;·&nbsp; Site &nbsp;·&nbsp; Area &nbsp;·&nbsp;
               Work Center &nbsp;·&nbsp; Work Unit &nbsp;·&nbsp; Equipment ID
             </p>
             <p class="meta-text" style="margin-bottom: var(--space-md);">
-              Using Excel? Go to <strong>File &rarr; Save As &rarr; CSV (Comma delimited)</strong>
-              before uploading. Duplicate entries are skipped automatically.
+              Duplicate entries are skipped automatically.
               Maximum 500 rows per upload.
             </p>
 
@@ -252,39 +259,21 @@
 
             <!-- File chooser row -->
             <div class="bulk-upload-row">
-              <input
-                type="file"
-                id="equipmentBulkFileInput"
-                accept=".csv"
-                style="display:none;"
+              <input type="file" id="equipmentBulkFileInput" accept=".csv" style="display:none;"
                 aria-label="Choose CSV file for bulk equipment upload">
-              <button
-                type="button"
-                class="btn btn-outline-secondary btn-sm"
-                id="equipmentBulkSelectBtn">
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="equipmentBulkSelectBtn">
                 Choose CSV File
               </button>
-              <span
-                class="bulk-upload-filename"
-                id="equipmentBulkFilename"
-                aria-live="polite">
+              <span class="bulk-upload-filename" id="equipmentBulkFilename" aria-live="polite">
                 No file chosen
               </span>
-              <button
-                type="button"
-                class="btn btn-primary btn-sm"
-                id="equipmentBulkUploadBtn"
-                disabled>
+              <button type="button" class="btn btn-primary btn-sm" id="equipmentBulkUploadBtn" disabled>
                 Upload
               </button>
             </div>
 
             <!-- Validation error list — hidden until a 422 response is received -->
-            <div
-              class="bulk-upload-errors"
-              id="equipmentBulkErrors"
-              style="display:none;"
-              role="alert"
+            <div class="bulk-upload-errors" id="equipmentBulkErrors" style="display:none;" role="alert"
               aria-live="assertive">
               <p class="bulk-upload-errors-title">
                 Fix the following errors and re-upload:
