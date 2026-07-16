@@ -123,6 +123,7 @@ def _row_to_record_out(row, attachment_count: int = 0) -> RecordOut:
         maintenance_type=row["maintenance_type"],
         created_time=row["created_time"] or "",
         equipment_id=row["equipment_id"],
+        equipment_full_path=row["equipment_full_path"],
         operating_conditions=row["operating_conditions"],
         inventory_consumables=row["inventory_consumables"],
         responsible_person=row["responsible_person"],
@@ -198,9 +199,9 @@ async def list_records(
         if search:
             keyword = f"%{search}%"
             conditions.append(
-                "(equipment_id LIKE ? OR responsible_person LIKE ? OR remarks LIKE ?)"
+                "(equipment_id LIKE ? OR equipment_full_path LIKE ? OR responsible_person LIKE ? OR remarks LIKE ?)"
             )
-            params.extend([keyword, keyword, keyword])
+            params.extend([keyword, keyword, keyword, keyword])
 
         where_clause = " AND ".join(conditions)
         order_clause = f"ORDER BY {sort_by} {sort_order.upper()}"
@@ -248,6 +249,7 @@ async def list_records(
 async def create_record(
     maintenance_type: str = Form(...),
     equipment_id: str = Form(...),
+    equipment_full_path: str = Form(...),
     responsible_person: str = Form(...),
     planned_start: Optional[str] = Form(None),
     planned_end: Optional[str] = Form(None),
@@ -273,6 +275,7 @@ async def create_record(
         validated = RecordCreate(
             maintenance_type=maintenance_type,
             equipment_id=equipment_id,
+            equipment_full_path=equipment_full_path,
             responsible_person=responsible_person,
             planned_start=planned_start,
             planned_end=planned_end,
@@ -280,6 +283,18 @@ async def create_record(
             inventory_consumables=inventory_consumables,
             remarks=remarks,
         )
+
+        equipment_row = fetch_one(
+            """SELECT full_path FROM equipment_hierarchy
+               WHERE equipment_id = ? AND full_path = ? AND is_active = 1""",
+            (validated.equipment_id, validated.equipment_full_path)
+        )
+        if not equipment_row:
+            raise HTTPException(
+                status_code=400,
+                detail="Equipment not found in the master list. Please select a valid equipment."
+            )
+        full_path = equipment_row["full_path"]
 
         # Filter out empty UploadFile entries (browser sends empty entry when no files chosen)
         valid_attachments = [a for a in attachments if a.filename]
@@ -319,17 +334,18 @@ async def create_record(
             """
             INSERT INTO maintenance_records (
                 maintenance_type, created_time, date_time,
-                equipment_id, operating_conditions, inventory_consumables,
+                equipment_id, equipment_full_path, operating_conditions, inventory_consumables,
                 responsible_person, planned_start, planned_end,
                 remarks, attachment_path, attachment_original_name,
                 created_by, created_date
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 validated.maintenance_type,
                 now_iso,
                 now_iso,  # date_time — legacy NOT NULL column; kept for DB constraint only, never read
                 validated.equipment_id,
+                full_path,
                 validated.operating_conditions,
                 validated.inventory_consumables,
                 validated.responsible_person,
