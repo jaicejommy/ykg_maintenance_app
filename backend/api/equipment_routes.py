@@ -4,12 +4,12 @@ from typing import List, Optional
 from datetime import datetime, timezone
 import sqlite3
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 
 from backend.auth import get_current_user, require_role
 from backend.database import fetch_all, fetch_one, execute
 from backend.models.equipment_models import EquipmentCreate, EquipmentUpdate, EquipmentOut
-from backend.constants import ROLES
+from backend.constants import ROLES, MAX_BULK_EQUIPMENT_ROWS, MAX_BULK_EQUIPMENT_FILE_MB
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +107,179 @@ async def create_equipment(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred while creating equipment."
         )
+
+REQUIRED_BULK_HEADERS = {
+    'enterprise_name',
+    'site',
+    'area',
+    'work_center',
+    'work_unit',
+    'equipment_id',
+}
+
+BULK_FIELD_LABELS = {
+    'enterprise_name': 'Enterprise Name',
+    'site':            'Site',
+    'area':            'Area',
+    'work_center':     'Work Center',
+    'work_unit':       'Work Unit',
+    'equipment_id':    'Equipment ID',
+}
+
+def _parse_csv_content(content: bytes) -> list[dict]:
+    import csv, io
+    text   = content.decode('utf-8-sig')  # utf-8-sig handles Excel BOM automatically
+    reader = csv.DictReader(io.StringIO(text))
+    # Normalize header names: strip whitespace, lowercase, replace spaces with underscores
+    if reader.fieldnames:
+        reader.fieldnames = [
+            h.strip().lower().replace(' ', '_')
+            for h in reader.fieldnames
+        ]
+    return [dict(row) for row in reader]
+
+def _validate_bulk_row(row: dict, row_number: int) -> list[str]:
+    errors = []
+    for field, label in BULK_FIELD_LABELS.items():
+        value = (row.get(field) or '').strip()
+        if not value:
+            errors.append(f"Row {row_number}: '{label}' is empty.")
+        elif len(value) > 200:
+            errors.append(f"Row {row_number}: '{label}' exceeds 200 characters.")
+    return errors
+
+def _is_blank_row(row: dict) -> bool:
+    return all(
+        not (row.get(field) or '').strip()
+        for field in REQUIRED_BULK_HEADERS
+    )
+
+@router.post("/bulk")
+async def bulk_upload_equipment(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(require_role(ROLES["ADMIN"]))
+):
+    try:
+        # ── 1. File validation ──────────────────────────────
+        filename = (file.filename or '').lower()
+        if not filename.endswith('.csv'):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Only .csv files are accepted. "
+                    "If you are using Excel, go to File -> Save As -> "
+                    "CSV (Comma delimited) first."
+                )
+            )
+
+        content = await file.read()
+
+        if len(content) > MAX_BULK_EQUIPMENT_FILE_MB * 1024 * 1024:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File exceeds the maximum allowed size of {MAX_BULK_EQUIPMENT_FILE_MB}MB."
+            )
+
+        if not content.strip():
+            raise HTTPException(status_code=400, detail="The uploaded file is empty.")
+
+        # ── 2. Parse ────────────────────────────────────────
+        raw_rows = _parse_csv_content(content)
+
+        if not raw_rows:
+            raise HTTPException(status_code=400, detail="No data rows found in the file.")
+
+        # ── 3. Header validation ────────────────────────────
+        present = set(raw_rows[0].keys())
+        missing = REQUIRED_BULK_HEADERS - present
+        if missing:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Missing required column(s): {', '.join(sorted(missing))}. "
+                    f"Required: Enterprise Name, Site, Area, Work Center, Work Unit, Equipment ID"
+                )
+            )
+
+        # ── 4. Filter blank rows ────────────────────────────
+        data_rows = [r for r in raw_rows if not _is_blank_row(r)]
+
+        if not data_rows:
+            raise HTTPException(
+                status_code=400,
+                detail="No data rows found after skipping blank rows."
+            )
+
+        # ── 5. Row count limit ──────────────────────────────
+        if len(data_rows) > MAX_BULK_EQUIPMENT_ROWS:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"File contains {len(data_rows)} rows, "
+                    f"which exceeds the maximum of {MAX_BULK_EQUIPMENT_ROWS}. "
+                    f"Please split the file and upload in batches."
+                )
+            )
+
+        # ── 6. Validate all rows before inserting anything ──
+        all_errors = []
+        for i, row in enumerate(data_rows, start=2):  # row 1 = header
+            all_errors.extend(_validate_bulk_row(row, i))
+
+        if all_errors:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "message": "Validation failed. No records were inserted. Fix the errors below and re-upload.",
+                    "errors":  all_errors,
+                }
+            )
+
+        # ── 7. Insert ───────────────────────────────────────
+        inserted = 0
+        skipped  = 0
+        now      = datetime.utcnow().isoformat()
+
+        for row in data_rows:
+            ename  = row['enterprise_name'].strip()
+            site   = row['site'].strip()
+            area   = row['area'].strip()
+            wc     = row['work_center'].strip()
+            wu     = row['work_unit'].strip()
+            eq_id  = row['equipment_id'].strip()
+            path   = f"{ename} > {site} > {area} > {wc} > {wu} > {eq_id}"
+
+            try:
+                execute(
+                    """
+                    INSERT INTO equipment_hierarchy
+                           (enterprise_name, site, area, work_center, work_unit,
+                            equipment_id, full_path, is_active, created_by, created_date)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                    """,
+                    (ename, site, area, wc, wu, eq_id, path,
+                     current_user["sub"], now)
+                )
+                inserted += 1
+            except sqlite3.IntegrityError:
+                skipped += 1
+
+        return {
+            "detail":   f"Upload complete. {inserted} equipment(s) added, {skipped} duplicate(s) skipped.",
+            "inserted": inserted,
+            "skipped":  skipped,
+            "total":    inserted + skipped,
+        }
+
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Unexpected error in POST /api/equipment/bulk")
+        raise HTTPException(
+            status_code=500,
+            detail="Bulk upload failed unexpectedly. Please try again."
+        )
+
 
 @router.put("/{equipment_id}", status_code=status.HTTP_200_OK)
 async def update_equipment(

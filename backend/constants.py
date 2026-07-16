@@ -79,3 +79,9 @@ HTTP_403_FORBIDDEN = 403
 HTTP_404_NOT_FOUND = 404
 HTTP_422_UNPROCESSABLE = 422
 HTTP_500_INTERNAL = 500
+
+# ---------------------------------------------------------------------------
+# Bulk equipment upload limits
+# ---------------------------------------------------------------------------
+MAX_BULK_EQUIPMENT_ROWS    = 500
+MAX_BULK_EQUIPMENT_FILE_MB = 5
