@@ -131,8 +131,6 @@ def _row_to_record_out(row, attachment_count: int = 0) -> RecordOut:
         planned_end=row["planned_end"],
         last_updated_time=row["last_updated_time"],
         remarks=row["remarks"],
-        attachment_path=row["attachment_path"],
-        attachment_original_name=row["attachment_original_name"],
         created_by=row["created_by"],
         created_date=row["created_date"],
         updated_by=row["updated_by"],
@@ -333,17 +331,15 @@ async def create_record(
         new_id = execute(
             """
             INSERT INTO maintenance_records (
-                maintenance_type, created_time, date_time,
+                maintenance_type, created_time,
                 equipment_id, equipment_full_path, operating_conditions, inventory_consumables,
                 responsible_person, planned_start, planned_end,
-                remarks, attachment_path, attachment_original_name,
-                created_by, created_date
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                remarks, created_by, created_date
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 validated.maintenance_type,
                 now_iso,
-                now_iso,  # date_time — legacy NOT NULL column; kept for DB constraint only, never read
                 validated.equipment_id,
                 full_path,
                 validated.operating_conditions,
@@ -352,8 +348,6 @@ async def create_record(
                 validated.planned_start,
                 validated.planned_end,
                 validated.remarks,
-                None,   # attachment_path — legacy column, new uploads go to record_attachments
-                None,   # attachment_original_name — legacy column
                 username,
                 now_iso,
             ),

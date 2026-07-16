@@ -59,6 +59,7 @@ def init_db() -> None:
                                              CHECK(maintenance_type IN ('Planned', 'Conducted')),
                 created_time             TEXT    NOT NULL,
                 equipment_id             TEXT    NOT NULL,
+                equipment_full_path      TEXT    NOT NULL,
                 operating_conditions     TEXT,
                 inventory_consumables    TEXT,
                 responsible_person       TEXT    NOT NULL,
@@ -66,8 +67,6 @@ def init_db() -> None:
                 planned_end              TEXT,
                 last_updated_time        TEXT,
                 remarks                  TEXT,
-                attachment_path          TEXT,
-                attachment_original_name TEXT,
                 created_by               TEXT    NOT NULL,
                 created_date             TEXT    NOT NULL,
                 updated_by               TEXT,
@@ -106,14 +105,7 @@ def init_db() -> None:
             )
             """
         )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS migrations_applied (
-                migration_name TEXT PRIMARY KEY,
-                applied_at     TEXT NOT NULL
-            )
-            """
-        )
+
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS equipment_hierarchy (
@@ -136,99 +128,6 @@ def init_db() -> None:
         logger.info("Database tables initialized successfully.")
     finally:
         conn.close()
-
-
-
-    # Migrate existing databases — add new columns if absent.
-    # The old date_time column is intentionally left on existing installations
-    # (SQLite DROP COLUMN is not reliably supported in older versions).
-    # No code anywhere reads from or writes to date_time going forward.
-    add_column_if_not_exists("maintenance_records", "created_time", "TEXT")
-    add_column_if_not_exists("maintenance_records", "planned_start", "TEXT")
-    add_column_if_not_exists("maintenance_records", "planned_end", "TEXT")
-    add_column_if_not_exists("maintenance_records", "last_updated_time", "TEXT")
-    add_column_if_not_exists("maintenance_records", "equipment_full_path", "TEXT")
-
-    # One-time data migration: copy legacy single-attachment data to record_attachments.
-    _run_attachment_migration_v1()
-
-
-
-# ---------------------------------------------------------------------------
-# One-time data migration
-# ---------------------------------------------------------------------------
-
-def _run_attachment_migration_v1() -> None:
-    """Copy legacy attachment_path / attachment_original_name data into record_attachments.
-
-    This migration is guarded by the migrations_applied table: it runs exactly
-    once per database and is a no-op on all subsequent startups.  The original
-    attachment_path and attachment_original_name columns on maintenance_records
-    are left untouched — this is an additive, non-destructive migration.
-    """
-    conn = get_connection()
-    try:
-        applied = conn.execute(
-            "SELECT 1 FROM migrations_applied WHERE migration_name = ?",
-            ("attachment_migration_v1",),
-        ).fetchone()
-
-        if applied:
-            logger.info("Attachment migration v1 already applied — skipping.")
-            return
-
-        legacy_rows = conn.execute(
-            "SELECT id, attachment_path, attachment_original_name, created_by, created_date "
-            "FROM maintenance_records WHERE attachment_path IS NOT NULL"
-        ).fetchall()
-
-        for row in legacy_rows:
-            conn.execute(
-                "INSERT INTO record_attachments "
-                "(record_id, file_path, original_filename, uploaded_by, uploaded_date) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (
-                    row["id"],
-                    row["attachment_path"],
-                    row["attachment_original_name"] or "",
-                    row["created_by"],
-                    row["created_date"] or "",
-                ),
-            )
-
-        conn.execute(
-            "INSERT INTO migrations_applied (migration_name, applied_at) VALUES (?, ?)",
-            ("attachment_migration_v1", datetime.now(tz=timezone.utc).isoformat()),
-        )
-        conn.commit()
-        logger.info(
-            "Attachment migration v1 complete: %d legacy attachment(s) migrated.",
-            len(legacy_rows),
-        )
-    except Exception:
-        logger.exception("Attachment migration v1 failed — will retry on next startup.")
-        try:
-            conn.rollback()
-        except Exception:
-            pass
-    finally:
-        conn.close()
-
-
-# ---------------------------------------------------------------------------
-# Schema migration helper
-# ---------------------------------------------------------------------------
-
-def add_column_if_not_exists(table: str, column: str, definition: str) -> None:
-    """Add a column to an existing table only if it does not already exist.
-
-    Uses PRAGMA table_info to inspect the current schema — safe to call
-    on every startup without duplicating columns.
-    """
-    existing = fetch_all(f"PRAGMA table_info({table})", ())
-    column_names = [row["name"] for row in existing]
-    if column not in column_names:
-        execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}", ())
 
 
 # ---------------------------------------------------------------------------

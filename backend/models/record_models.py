@@ -214,8 +214,6 @@ class RecordOut(BaseModel):
     planned_end: Optional[str] = None
     last_updated_time: Optional[str] = None
     remarks: Optional[str] = None
-    attachment_path: Optional[str] = None
-    attachment_original_name: Optional[str] = None
     created_by: str
     created_date: str
     updated_by: Optional[str] = None
