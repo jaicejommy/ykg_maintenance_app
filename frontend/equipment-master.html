@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Maintenance Management System — manage user accounts (Administrator only)." />
+  <title>Manage Users — Maintenance Management System</title>
+  <link rel="stylesheet" href="css/bootstrap.min.css" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+
+<body>
+
+  <div class="app-shell">
+
+    <!-- =====================================================================
+       FIXED LEFT SIDEBAR
+       ===================================================================== -->
+    <aside class="sidebar" id="sidebar">
+
+      <!-- Logo / App Identity -->
+      <div class="sidebar-brand">
+        <span class="sidebar-brand-mark">MMS</span>
+        <span class="sidebar-brand-label">Maintenance<br>Management</span>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <!-- Primary Navigation -->
+      <nav class="sidebar-nav" role="navigation" aria-label="Main navigation">
+        <span class="section-label sidebar-section-label">Navigation</span>
+        <ul class="sidebar-menu">
+          <li class="sidebar-item">
+            <a href="dashboard.html" class="sidebar-link" id="nav-dashboard">
+              <span class="sidebar-icon">&#9783;</span>
+              <span class="sidebar-label">Dashboard</span>
+            </a>
+          </li>
+          <li class="sidebar-item" id="nav-new-record-item">
+            <a href="form.html" class="sidebar-link" id="nav-new-record">
+              <span class="sidebar-icon">+</span>
+              <span class="sidebar-label">New Record</span>
+            </a>
+          </li>
+          <!-- Shown only for Administrators — toggled via app.js -->
+          <li class="sidebar-item" id="nav-manage-users-item">
+            <a href="manage-users.html" class="sidebar-link" id="nav-manage-users">
+              <span class="sidebar-icon">&#9707;</span>
+              <span class="sidebar-label">Manage Users</span>
+            </a>
+          </li>
+          <li class="sidebar-item" id="nav-equipment-master-item">
+            <a href="equipment-master.html" class="sidebar-link" id="nav-equipment-master">
+              <span class="sidebar-icon">&#9881;</span>
+              <span class="sidebar-label">Equipment Master</span>
+            </a>
+          </li>
+
+          <!-- Add after existing nav items, before sidebar-footer -->
+          <li class="sidebar-divider"
+            style="margin: var(--space-sm) 0; height: 1px; background: var(--color-sidebar-border);"></li>
+
+          <li class="sidebar-item" id="nav-trash-item">
+            <a href="trash.html" class="sidebar-link" id="nav-trash">
+              <span class="sidebar-icon">&#8942;</span>
+              <span class="sidebar-label">Deleted Records</span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+
+      <!-- Mobile-only user controls — hidden on desktop via CSS -->
+      <div class="sidebar-mobile-controls" id="sidebarMobileControls">
+        <button type="button" class="sidebar-mobile-avatar" id="mobileUserAvatar" title="Change Password">
+        </button>
+        <button type="button" class="sidebar-mobile-logout" id="mobileLogoutBtn" title="Logout">
+          Logout
+        </button>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <!-- Bottom: User Info + Logout -->
+      <div class="sidebar-footer">
+        <div class="sidebar-user">
+          <div class="sidebar-user-avatar" id="sidebarUserAvatar" style="cursor: pointer;" title="Change Password">—
+          </div>
+          <div class="sidebar-user-info">
+            <span class="sidebar-user-name" id="sidebarUsername">—</span>
+            <span class="sidebar-user-role" id="sidebarUserRole">—</span>
+          </div>
+        </div>
+        <button class="sidebar-logout-btn" id="logoutBtn">Logout</button>
+      </div>
+
+    </aside>
+
+    <!-- =====================================================================
+       MAIN CONTENT AREA
+       ===================================================================== -->
+    <main class="main-content" role="main">
+
+      <!-- Top Bar -->
+      <header class="topbar">
+        <span class="topbar-title" id="topbar-page-title">Equipment Master</span>
+        <span class="topbar-meta" id="topbar-user-meta"></span>
+      </header>
+
+      <!-- Page Content -->
+      <div class="page-content">
+
+        <!-- Page header -->
+        <div class="form-page-header d-flex justify-content-between align-items-center">
+          <div>
+            <h1 class="form-page-title">Equipment Master</h1>
+            <p class="form-page-subtitle">Manage the global equipment hierarchy.</p>
+          </div>
+          <button id="btn-add-equipment" class="btn btn-primary d-none">Add Equipment</button>
+        </div>
+
+        <!-- ── Search & Filter ──────────────────────────────────────────────── -->
+        <div class="section-card mb-4">
+          <div class="row g-3 align-items-center">
+            <div class="col-md-6">
+              <input type="text" id="equipment-search-input" class="form-control" placeholder="Search equipment...">
+            </div>
+            <div class="col-md-6">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="equipment-active-only" checked>
+                <label class="form-check-label" for="equipment-active-only">
+                  Active Only
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Equipment Table ──────────────────────────────────────────── -->
+        <div class="section-card">
+          <div class="section-card-title">Equipment List</div>
+
+          <div class="records-table-wrapper">
+            <table class="records-table" role="grid" aria-label="Equipment Master">
+              <thead>
+                <tr>
+                  <th scope="col">#</th>
+                  <th scope="col">Enterprise</th>
+                  <th scope="col">Site</th>
+                  <th scope="col">Area</th>
+                  <th scope="col">Work Center</th>
+                  <th scope="col">Work Unit</th>
+                  <th scope="col">Equipment ID</th>
+                  <th scope="col">Status</th>
+                  <th scope="col" id="equipment-actions-th">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="equipment-master-tbody" aria-live="polite">
+                <!-- Rows injected by ui.js renderEquipmentMasterTable() -->
+              </tbody>
+            </table>
+
+            <!-- Empty state -->
+            <div id="equipment-empty-state" class="empty-state" style="display: none;" role="status" aria-live="polite">
+              <p class="empty-state-text">No equipment found.</p>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /.page-content -->
+
+    </main>
+
+  </div><!-- /.app-shell -->
+
+  <!-- =====================================================================
+     ADD EQUIPMENT MODAL
+     ===================================================================== -->
+  <div class="modal fade" id="addEquipmentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Add Equipment</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="add-equipment-form" novalidate autocomplete="off">
+            <div class="mb-3">
+              <label class="form-label" for="eq-enterprise">Enterprise <span class="required-star">*</span></label>
+              <input type="text" class="form-control" id="eq-enterprise" required>
+              <div class="field-error" id="eq-enterprise-error"></div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="eq-site">Site <span class="required-star">*</span></label>
+              <input type="text" class="form-control" id="eq-site" required>
+              <div class="field-error" id="eq-site-error"></div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="eq-area">Area <span class="required-star">*</span></label>
+              <input type="text" class="form-control" id="eq-area" required>
+              <div class="field-error" id="eq-area-error"></div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="eq-work-center">Work Center <span class="required-star">*</span></label>
+              <input type="text" class="form-control" id="eq-work-center" required>
+              <div class="field-error" id="eq-work-center-error"></div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="eq-work-unit">Work Unit <span class="required-star">*</span></label>
+              <input type="text" class="form-control" id="eq-work-unit" required>
+              <div class="field-error" id="eq-work-unit-error"></div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="eq-id">Equipment ID <span class="required-star">*</span></label>
+              <input type="text" class="form-control" id="eq-id" required>
+              <div class="field-error" id="eq-id-error"></div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="btn-save-equipment">Save Equipment</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- =====================================================================
+     DOUBLE-CONFIRMATION MODAL (Changes 2 and 3)
+     Shared modal — body content is transformed in-place between Step 1 and Step 2
+     by openTypeToConfirmModal() in ui.js. Only one modal instance is needed.
+     ===================================================================== -->
+  <div class="modal fade" id="type-to-confirm-modal" tabindex="-1" aria-labelledby="type-to-confirm-modal-title"
+    aria-hidden="true" role="dialog">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title" id="type-to-confirm-modal-title" style="font-size: 1rem;">
+            <!-- Title set dynamically by JS -->
+          </h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <!-- Step 1 body — shown initially -->
+        <div class="modal-body" id="confirm-modal-step1-body">
+          <!-- Content set dynamically by JS -->
+        </div>
+        <!-- Step 2 body — type-to-confirm; hidden until Step 1 continues -->
+        <div class="modal-body d-none" id="confirm-modal-step2-body">
+          <p>Type <strong id="confirmUsernameTarget"></strong> to confirm this action.</p>
+          <input type="text" class="form-control mt-2" id="confirmUsernameInput" autocomplete="off"
+            aria-label="Type username to confirm" />
+        </div>
+        <div class="modal-footer" id="confirm-modal-footer">
+          <!-- Buttons set dynamically by JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+     CHANGE PASSWORD MODAL
+     Triggered by clicking the sidebar avatar (#sidebarUserAvatar).
+     Wired in app.js initChangePasswordModal().
+     ===================================================================== -->
+  <div class="modal fade" id="changePasswordModal" tabindex="-1" aria-labelledby="changePasswordModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="changePasswordModalLabel">Change Password</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <!-- Dummy username to prevent browser password managers from hijacking preceding text fields -->
+          <input type="text" name="dummy_username" autocomplete="username"
+            style="position: absolute; opacity: 0; height: 0; width: 0; z-index: -1;" aria-hidden="true">
+          <div class="mb-3">
+            <label class="form-label" for="currentPassword">Current Password</label>
+            <input type="password" class="form-control" id="currentPassword" autocomplete="current-password">
+            <div class="invalid-feedback" id="currentPassword-error"></div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="newPassword">New Password</label>
+            <input type="password" class="form-control" id="newPassword" autocomplete="new-password">
+            <div class="invalid-feedback" id="newPassword-error"></div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="confirmNewPassword">Confirm New Password</label>
+            <input type="password" class="form-control" id="confirmNewPassword" autocomplete="new-password">
+            <div class="invalid-feedback" id="confirmNewPassword-error"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="changePasswordSubmitBtn">Change Password</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/bootstrap.bundle.min.js"></script>
+  <script src="js/constants.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/validators.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/app.js"></script>
+</body>
+
+</html>
