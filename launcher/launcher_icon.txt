@@ -1,0 +1,1 @@
+Please provide a launcher_icon.ico file in this directory if you wish to set a custom icon for the application shortcut.
