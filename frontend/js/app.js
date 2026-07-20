@@ -1133,6 +1133,22 @@ async function initFormPage() {
   }
   buildEquipmentDropdown(equipmentList, equipmentSearchEl, equipmentListEl, equipmentIdEl);
 
+  // Fetch active users for the "Responsible Person" datalist
+  try {
+    const activeUsers = await getActiveUsernames();
+    const datalist = document.getElementById("active-users-list");
+    if (datalist) {
+      datalist.textContent = "";
+      activeUsers.forEach(username => {
+        const option = document.createElement("option");
+        option.value = username;
+        datalist.appendChild(option);
+      });
+    }
+  } catch (err) {
+    console.warn("Failed to fetch active users for datalist", err);
+  }
+
   // For edit mode, load and pre-populate the form then fetch existing attachments
   let editRecord = null;
   if (isEdit) {

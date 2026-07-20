@@ -124,6 +124,22 @@ async function createUser(userData) {
 }
 
 /**
+ * Fetch all active usernames (Available to any authenticated user).
+ * @returns {Promise<Array<string>>}
+ */
+async function getActiveUsernames() {
+  const response = await fetch(`${API_BASE}/api/users/active`, {
+    method: "GET",
+    headers: buildAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    await throwResponseError(response);
+  }
+  return response.json();
+}
+
+/**
  * Fetch all user accounts (Administrator only).
  * @returns {Promise<Array>}
  */

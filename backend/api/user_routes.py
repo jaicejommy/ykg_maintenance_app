@@ -7,7 +7,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from backend.auth import hash_password, require_role
+from backend.auth import hash_password, require_role, get_current_user
 from backend.constants import ROLES
 from backend.database import execute, fetch_all, fetch_one
 from backend.models.user_models import UserCreate, UserOut, UserUpdate
@@ -27,6 +27,22 @@ def _row_to_user_out(row) -> UserOut:
         role=row["role"],
         is_active=bool(row["is_active"]),
     )
+
+
+@router.get("/active", status_code=status.HTTP_200_OK)
+async def list_active_usernames(
+    _current_user: dict = Depends(get_current_user),
+) -> List[str]:
+    """Return all active usernames. Any authenticated user can access this."""
+    try:
+        rows = fetch_all("SELECT username FROM users WHERE is_active = 1", ())
+        return [row["username"] for row in rows]
+    except Exception:
+        logger.exception("Error listing active usernames.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while retrieving active users.",
+        )
 
 
 @router.get("", status_code=status.HTTP_200_OK)
