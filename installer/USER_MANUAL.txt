@@ -1,0 +1,77 @@
+========================================================================
+ MAINTENANCE MANAGEMENT SYSTEM — INSTALLATION & USER GUIDE
+========================================================================
+
+Welcome to the Maintenance Management System! This application provides 
+offline maintenance data entry, storage, and management for operations.
+
+This guide will walk you through installing the application and logging in
+for the very first time.
+
+------------------------------------------------------------------------
+ 1. SYSTEM REQUIREMENTS
+------------------------------------------------------------------------
+- Operating System: Windows 10 or Windows 11 (64-bit)
+- Internet Connection: NOT REQUIRED (The installer is 100% offline)
+- Administrator privileges are required for the initial installation.
+
+
+------------------------------------------------------------------------
+ 2. INSTALLATION INSTRUCTIONS
+------------------------------------------------------------------------
+1. Copy the "MMS_Setup_v1.0.exe" file to your computer (e.g., to your Desktop).
+2. Double-click the installer to run it.
+   (If Windows prompts you for Administrator permission, click "Yes").
+3. Follow the on-screen instructions. The installer will automatically:
+   - Install the required Python environment if it's missing.
+   - Extract the offline dependencies.
+   - Set up the internal database.
+   - Create a shortcut on your Desktop and in your Start Menu.
+4. Once the installation is complete, click "Finish". 
+
+
+------------------------------------------------------------------------
+ 3. HOW TO LAUNCH THE APPLICATION
+------------------------------------------------------------------------
+1. Double-click the "Maintenance Management System" shortcut on your Desktop
+   (or search for it in your Windows Start Menu).
+2. Wait roughly 3 to 5 seconds. The background server will start
+   silently, and your default web browser will automatically open to the
+   Application Login Page.
+
+*Note: The application runs completely locally on your computer. It does
+not communicate with the outside internet.*
+
+
+------------------------------------------------------------------------
+ 4. FIRST-TIME LOGIN
+------------------------------------------------------------------------
+Upon launching, you will be greeted by the Login Page. 
+Since this is a fresh installation, a default Administrator account has
+been automatically created for you.
+
+Please log in using the following default credentials:
+
+   Username: admin
+   Password: AdminPass123!
+
+*IMPORTANT:* For security reasons, it is highly recommended that you go to 
+the "Manage Users" page immediately after logging in to change this 
+password or create your own personal Admin account.
+
+
+------------------------------------------------------------------------
+ 5. HOW TO UNINSTALL
+------------------------------------------------------------------------
+If you need to remove the application from your computer:
+1. Open the Windows Start Menu and search for "Add or remove programs".
+2. Find "Maintenance Management System" in the list and click "Uninstall".
+3. The uninstaller will safely shut down the application and remove the core files.
+
+*Data Preservation Note:* 
+To prevent accidental data loss, the uninstaller will intentionally LEAVE your 
+database and uploaded attachments on your computer. 
+If you wish to completely wipe all data, you must manually delete the 
+"C:\ykg_maintenance" folder after uninstalling.
+
+========================================================================
