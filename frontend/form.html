@@ -186,20 +186,22 @@
           <div class="row g-3">
             <!-- Responsible Person -->
             <div class="col-md-6">
-              <label for="field-responsible-person" class="form-label">
+              <label for="field-responsible-person-select" class="form-label">
                 Responsible Person <span class="required-star" aria-hidden="true">*</span>
               </label>
+              <select id="field-responsible-person-select" class="form-select">
+                <option value="">Select responsible person...</option>
+                <!-- populated by JS -->
+                <option value="__other__">Other (Specify below)</option>
+              </select>
               <input
                 type="text"
                 id="field-responsible-person"
-                name="responsible_person"
-                list="active-users-list"
-                class="form-control"
+                class="form-control mt-2"
+                style="display: none;"
                 placeholder="Name of responsible engineer"
-                required
                 maxlength="100"
               />
-              <datalist id="active-users-list"></datalist>
               <div id="field-responsible-person-error" class="field-error" role="alert"></div>
             </div>
           </div>

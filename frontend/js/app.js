@@ -1133,20 +1133,36 @@ async function initFormPage() {
   }
   buildEquipmentDropdown(equipmentList, equipmentSearchEl, equipmentListEl, equipmentIdEl);
 
-  // Fetch active users for the "Responsible Person" datalist
+  // ── Responsible Person Dropdown Setup ──
+  const rpSelect = document.getElementById("field-responsible-person-select");
+  const rpInput  = document.getElementById("field-responsible-person");
+  let activeUsers = [];
   try {
-    const activeUsers = await getActiveUsernames();
-    const datalist = document.getElementById("active-users-list");
-    if (datalist) {
-      datalist.textContent = "";
-      activeUsers.forEach(username => {
-        const option = document.createElement("option");
-        option.value = username;
-        datalist.appendChild(option);
-      });
-    }
+    activeUsers = await getActiveUserNames();
   } catch (err) {
-    console.warn("Failed to fetch active users for datalist", err);
+    console.error("Failed to fetch active users:", err);
+  }
+
+  if (rpSelect && rpInput) {
+    // Populate the dropdown (inserting before the "__other__" option)
+    const otherOpt = rpSelect.querySelector('option[value="__other__"]');
+    activeUsers.forEach(username => {
+      const opt = document.createElement("option");
+      opt.value = username;
+      opt.textContent = username;
+      rpSelect.insertBefore(opt, otherOpt);
+    });
+
+    // Toggle the "Other" input visibility on change
+    rpSelect.addEventListener("change", () => {
+      if (rpSelect.value === "__other__") {
+        rpInput.style.display = "block";
+        rpInput.focus();
+      } else {
+        rpInput.style.display = "none";
+        rpInput.value = "";
+      }
+    });
   }
 
   // For edit mode, load and pre-populate the form then fetch existing attachments
@@ -1160,6 +1176,20 @@ async function initFormPage() {
 
         // Pre-populate the searchable equipment dropdown with the stored value
         setEquipmentDropdownValue(equipmentList, editRecord.equipment_id, equipmentSearchEl, equipmentIdEl);
+
+        // Pre-populate the Responsible Person dropdown vs "Other" input
+        if (rpSelect && rpInput && editRecord.responsible_person) {
+          const matchingOption = Array.from(rpSelect.options).find(opt => opt.value === editRecord.responsible_person);
+          if (matchingOption && matchingOption.value !== "__other__") {
+            rpSelect.value = editRecord.responsible_person;
+            rpInput.style.display = "none";
+            rpInput.value = "";
+          } else {
+            rpSelect.value = "__other__";
+            rpInput.style.display = "block";
+            rpInput.value = editRecord.responsible_person;
+          }
+        }
 
         // Render existing attachments list (replaces old single-attachment block)
         await renderExistingAttachments(editId);
@@ -1246,12 +1276,21 @@ async function initFormPage() {
     // Read the hidden input value — set only when the user explicitly clicks a list item
     const equipmentId          = document.getElementById("equipmentId")?.value ?? "";
     const equipmentFullPath    = document.getElementById("equipmentSearch")?.value ?? "";
-    const responsiblePerson    = document.getElementById("field-responsible-person")?.value ?? "";
+
+    const rpSelectValue = document.getElementById("field-responsible-person-select")?.value ?? "";
+    let responsiblePerson = rpSelectValue;
+    let rpFieldId = "field-responsible-person-select";
+    if (rpSelectValue === "__other__") {
+      responsiblePerson = document.getElementById("field-responsible-person")?.value ?? "";
+      rpFieldId = "field-responsible-person";
+    }
+
     const plannedStart         = document.getElementById("field-planned-start")?.value ?? "";
     const plannedEnd           = document.getElementById("field-planned-end")?.value ?? "";
     const operatingConditions  = document.getElementById("field-operating-conditions")?.value ?? "";
     const inventoryConsumables = document.getElementById("field-inventory-consumables")?.value ?? "";
     const remarks              = document.getElementById("field-remarks")?.value ?? "";
+
     // Run all per-field validators and collect errors
     const validations = [
       { fieldId: "field-maintenance-type", result: validateMaintenanceType(maintenanceType) },
@@ -1262,8 +1301,8 @@ async function initFormPage() {
           ? { valid: true, message: "" }
           : { valid: false, message: "Please select an equipment ID from the list." },
       },
-      { fieldId: "field-responsible-person",    result: validateRequired(responsiblePerson, "Responsible Person") },
-      { fieldId: "field-responsible-person",    result: validateMaxLength(responsiblePerson, MAX_RESPONSIBLE_PERSON_LENGTH, "Responsible Person") },
+      { fieldId: rpFieldId, result: validateRequired(responsiblePerson, "Responsible Person") },
+      { fieldId: rpFieldId, result: validateMaxLength(responsiblePerson, MAX_RESPONSIBLE_PERSON_LENGTH, "Responsible Person") },
       { fieldId: "field-planned-start",         result: validateDatetimeOptional(plannedStart, "Planned Start") },
       { fieldId: "field-planned-end",           result: validateDatetimeOptional(plannedEnd, "Planned End") },
       { fieldId: "field-operating-conditions",  result: validateMaxLength(operatingConditions, MAX_TEXT_FIELD_LENGTH, "Operating Conditions") },

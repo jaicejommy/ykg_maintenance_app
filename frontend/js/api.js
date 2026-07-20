@@ -124,22 +124,6 @@ async function createUser(userData) {
 }
 
 /**
- * Fetch all active usernames (Available to any authenticated user).
- * @returns {Promise<Array<string>>}
- */
-async function getActiveUsernames() {
-  const response = await fetch(`${API_BASE}/api/users/active`, {
-    method: "GET",
-    headers: buildAuthHeaders(),
-  });
-
-  if (!response.ok) {
-    await throwResponseError(response);
-  }
-  return response.json();
-}
-
-/**
  * Fetch all user accounts (Administrator only).
  * @returns {Promise<Array>}
  */
@@ -481,6 +465,26 @@ async function downloadCsv(recordId) {
   // Revoke immediately after click
   URL.revokeObjectURL(objectUrl);
   document.body.removeChild(anchor);
+}
+
+// ---------------------------------------------------------------------------
+// Users
+// ---------------------------------------------------------------------------
+
+/**
+ * Retrieve a list of active usernames for form dropdowns.
+ * @returns {Promise<string[]>}
+ */
+async function getActiveUserNames() {
+  const token = getToken();
+  const response = await fetch(`${API_BASE}/users/active`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || `Failed to fetch active users (${response.status})`);
+  }
+  return response.json();
 }
 
 // ---------------------------------------------------------------------------
