@@ -295,9 +295,21 @@ def _build_pdf(data: dict, exported_by: str) -> bytes:
                 )
             )
 
-        csv_table_data = [csv_headers] + [
-            [_fmt(cell) for cell in row] for row in rows_to_render
+        csv_cell_style = make_style("C", fontSize=7, fontName="Helvetica", leading=8, wordWrap='CJK')
+        csv_header_style = make_style("CH", fontSize=7, fontName="Helvetica-Bold", textColor=C_WHITE, leading=8, wordWrap='CJK')
+
+        def _make_para(txt, style):
+            # Paragraph interprets HTML-like tags, so we must escape basic XML characters
+            escaped = str(txt).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            return Paragraph(escaped, style)
+
+        csv_table_data = [
+            [_make_para(h, csv_header_style) for h in csv_headers]
         ]
+        for row in rows_to_render:
+            csv_table_data.append(
+                [_make_para(_fmt(cell), csv_cell_style) for cell in row]
+            )
 
         n_cols = max(len(csv_headers), 1)
         col_w  = min(PAGE_W / n_cols, 110)  # cap each column at 110pt
