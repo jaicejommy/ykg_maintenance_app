@@ -89,7 +89,18 @@ async def create_equipment(
 ) -> EquipmentOut:
     """Create a new equipment hierarchy entry."""
     try:
-        full_path = f"{payload.enterprise_name.strip()} > {payload.site.strip()} > {payload.area.strip()} > {payload.work_center.strip()} > {payload.work_unit.strip()} > {payload.equipment_id.strip()}"
+        path_parts = [
+            payload.enterprise_name.strip(),
+            payload.site.strip()
+        ]
+        if payload.area and payload.area.strip():
+            path_parts.append(payload.area.strip())
+        if payload.work_center and payload.work_center.strip():
+            path_parts.append(payload.work_center.strip())
+        if payload.work_unit and payload.work_unit.strip():
+            path_parts.append(payload.work_unit.strip())
+        path_parts.append(payload.equipment_id.strip())
+        full_path = " > ".join(path_parts)
         created_date = datetime.now(timezone.utc).isoformat()
         created_by = current_user["sub"]
 
@@ -153,9 +164,10 @@ def _parse_csv_content(content: bytes) -> list[dict]:
 
 def _validate_bulk_row(row: dict, row_number: int) -> list[str]:
     errors = []
+    required_fields = {'enterprise_name', 'site', 'equipment_id'}
     for field, label in BULK_FIELD_LABELS.items():
         value = (row.get(field) or '').strip()
-        if not value:
+        if not value and field in required_fields:
             errors.append(f"Row {row_number}: '{label}' is empty.")
         elif len(value) > 200:
             errors.append(f"Row {row_number}: '{label}' exceeds 200 characters.")
@@ -262,7 +274,13 @@ async def bulk_upload_equipment(
                 wc     = row['work_center'].strip()
                 wu     = row['work_unit'].strip()
                 eq_id  = row['equipment_id'].strip()
-                path   = f"{ename} > {site} > {area} > {wc} > {wu} > {eq_id}"
+                
+                path_parts = [ename, site]
+                if area: path_parts.append(area)
+                if wc: path_parts.append(wc)
+                if wu: path_parts.append(wu)
+                path_parts.append(eq_id)
+                path   = " > ".join(path_parts)
 
                 try:
                     conn.execute(
