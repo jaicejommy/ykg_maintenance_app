@@ -69,9 +69,11 @@ def _get_export_data(record_id: int) -> dict | None:
     csv_rows = None
     if csv_row is not None:
         try:
-            csv_headers = json.loads(csv_row["headers"])
-            csv_rows = json.loads(csv_row["rows"])
-        except (TypeError, json.JSONDecodeError):
+            all_rows = json.loads(csv_row["rows"])
+            if all_rows and len(all_rows) > 0:
+                csv_headers = all_rows[0]
+                csv_rows = all_rows[1:]
+        except Exception:
             csv_headers = None
             csv_rows = None
 
