@@ -477,7 +477,7 @@ async function downloadCsv(recordId) {
  */
 async function getActiveUserNames() {
   const token = getToken();
-  const response = await fetch(`${API_BASE}/users/active`, {
+  const response = await fetch(`${API_BASE}/api/users/active`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) {
