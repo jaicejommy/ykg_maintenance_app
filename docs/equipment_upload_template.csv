@@ -1,0 +1,13 @@
+Enterprise Name,Site,Area,Work Center,Work Unit,Equipment ID
+Bapco,Refinery,Sitra,CDU Train A,Boiler Unit,BX-101
+Bapco,Refinery,Riffa,CDU Train A,Boiler Unit,BX-102
+Alba,Refinery,Arad,CDU Train B,Heat Exchanger Unit,HE-204
+GPIC,Smelter,Sitra,Hydrogen Unit,Vacuum Tower,VT-301
+GPIC,Smelter,Riffa,Flare System,Overhead Condenser,OC-302
+Bapco,Smelter,Jannusan,CRU Train A,Reactor Unit,RX-401
+Aramco,Mill,Sitra,CRU Train A,Compressor Unit,CP-402
+GPIC,Mill,Riffa,FCC Train A,Regenerator,RG-501
+Bapco,Mill,Zinj,FCC Train A,Main Fractionator,MF-502
+Aramco,Plant,Sitra,Mixing Section,Mixer Cell,MC-601
+Aramco,Plant,Riffa,Carbon Plant,Green Mill,GM-407
+Alba,Plant,Budaiya,Rod Shop,Rod Mill 1,RM-205
