@@ -24,6 +24,19 @@ function classifyRow(row) {
 
 function parseColumnSchema(rawHeader) {
     const raw = (rawHeader || '').trim();
+    
+    // If the header is completely empty (e.g. trailing padded commas in Excel CSVs), hide it.
+    if (raw === '') {
+        return {
+            rawHeader: rawHeader,
+            type: 'meta',
+            key: null,
+            label: '',
+            options: null,
+            hidden: true
+        };
+    }
+
     const match = raw.match(/^<([^>]+)>(.*)$/);
     if (!match) {
         return {
