@@ -1136,6 +1136,7 @@ async function initFormPage() {
   // ── Responsible Person Dropdown Setup ──
   const rpSelect = document.getElementById("field-responsible-person-select");
   const rpInput  = document.getElementById("field-responsible-person");
+  const rpInputContainer = document.getElementById("responsible-person-input-container");
   let activeUsers = [];
   try {
     activeUsers = await getActiveUserNames();
@@ -1143,7 +1144,7 @@ async function initFormPage() {
     console.error("Failed to fetch active users:", err);
   }
 
-  if (rpSelect && rpInput) {
+  if (rpSelect && rpInput && rpInputContainer) {
     // Populate the dropdown (inserting before the "__other__" option)
     const otherOpt = rpSelect.querySelector('option[value="__other__"]');
     activeUsers.forEach(username => {
@@ -1156,10 +1157,10 @@ async function initFormPage() {
     // Toggle the "Other" input visibility on change
     rpSelect.addEventListener("change", () => {
       if (rpSelect.value === "__other__") {
-        rpInput.style.display = "block";
+        rpInputContainer.classList.remove("d-none");
         rpInput.focus();
       } else {
-        rpInput.style.display = "none";
+        rpInputContainer.classList.add("d-none");
         rpInput.value = "";
       }
     });
@@ -1178,15 +1179,15 @@ async function initFormPage() {
         setEquipmentDropdownValue(equipmentList, editRecord.equipment_id, equipmentSearchEl, equipmentIdEl);
 
         // Pre-populate the Responsible Person dropdown vs "Other" input
-        if (rpSelect && rpInput && editRecord.responsible_person) {
+        if (rpSelect && rpInput && rpInputContainer && editRecord.responsible_person) {
           const matchingOption = Array.from(rpSelect.options).find(opt => opt.value === editRecord.responsible_person);
           if (matchingOption && matchingOption.value !== "__other__") {
             rpSelect.value = editRecord.responsible_person;
-            rpInput.style.display = "none";
+            rpInputContainer.classList.add("d-none");
             rpInput.value = "";
           } else {
             rpSelect.value = "__other__";
-            rpInput.style.display = "block";
+            rpInputContainer.classList.remove("d-none");
             rpInput.value = editRecord.responsible_person;
           }
         }
