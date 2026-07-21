@@ -1821,6 +1821,7 @@ async function initRecordDetailPage() {
   await _loadChecklist(recordId, canEdit);
 
   const btnUpload   = document.getElementById("btn-csv-upload");
+  const btnTemplate = document.getElementById("btn-csv-template");
   const btnSave     = document.getElementById("btn-csv-save");
   const btnUndo     = document.getElementById("btn-csv-undo");
   const btnDownload = document.getElementById("btn-csv-download");
@@ -1828,6 +1829,10 @@ async function initRecordDetailPage() {
 
   if (canEdit && btnUpload) {
       btnUpload.classList.remove("d-none");
+  }
+  if (canEdit && btnTemplate) {
+      btnTemplate.classList.remove("d-none");
+      btnTemplate.addEventListener("click", _downloadChecklistTemplate);
   }
   if (canEdit && btnSave) btnSave.classList.remove("d-none");
   if (canEdit && btnUndo) btnUndo.classList.remove("d-none");
@@ -2343,9 +2348,6 @@ async function initEquipmentMasterPage() {
         const validations = [
           { fieldId: "eq-enterprise", result: validateRequired(enterprise, "Enterprise") },
           { fieldId: "eq-site", result: validateRequired(site, "Site") },
-          { fieldId: "eq-area", result: validateRequired(area, "Area") },
-          { fieldId: "eq-work-center", result: validateRequired(workCenter, "Work Center") },
-          { fieldId: "eq-work-unit", result: validateRequired(workUnit, "Work Unit") },
           { fieldId: "eq-id", result: validateRequired(equipmentId, "Equipment ID") }
         ];
 
@@ -2649,7 +2651,7 @@ function _showBulkErrors(errors, errorsEl, errListEl) {
 }
 
 function _downloadEquipmentTemplate() {
-    const header  = 'Enterprise Name,Site,Area,Work Center,Work Unit,Equipment ID';
+    const header  = 'Enterprise Name,Site,Area (Optional),Work Center (Optional),Work Unit (Optional),Equipment ID';
     const example = 'Bapco,Sitra Refinery,Crude Distillation Unit,CDU Train A,Boiler Unit,BX-101';
     const csv     = header + '\r\n' + example + '\r\n';
 
@@ -2662,4 +2664,13 @@ function _downloadEquipmentTemplate() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url); // revoke immediately after click
+}
+
+function _downloadChecklistTemplate() {
+    const a = document.createElement('a');
+    a.setAttribute('href', 'sample_checklist_template.csv');
+    a.setAttribute('download', 'sample_checklist_template.csv');
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
 }
